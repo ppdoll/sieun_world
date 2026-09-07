@@ -195,6 +195,18 @@ DB 는 쓰지 않는다. 두 겹으로 저장한다.
 
 목록 조작은 전부 `shared/wordsets.mjs` 의 순수 함수다. 회차를 넘는 오답 누적(§3.5)은 아직 없다. 필요해지면 같은 방식으로 `data` 브랜치에 파일을 하나 더 두거나 그때 DB 를 결정한다.
 
+### 모델 비교
+
+`scripts/compare-models.mjs` 가 같은 사진을 여러 모델에 넣어 추출 정확도(단어 재현, 뜻 일치, 덩어리 분리)·속도·비용을 비교하고, 파닉스·연상·이야기는 나란히 출력한다. 실제 앱과 같은 프롬프트와 4단계 검증을 쓴다.
+
+```bash
+node scripts/compare-models.mjs --models claude-opus-5,claude-sonnet-5,claude-haiku-4-5
+```
+
+- 사진은 `test_img/` (git 에 올라가지 않는다), 정답은 `test_img/answers.json` — 검수 화면에서 고친 최종 단어장을 그대로 쓴다
+- 키는 `.env.local` 의 `ANTHROPIC_API_KEY`
+- 결과는 콘솔 표와 `test_img/compare-<시각>.md`
+
 ### 아이콘·미리보기 이미지
 
 `public/` 의 아이콘(favicon, 홈 화면 아이콘)과 링크 미리보기(`og.png`)는 `scripts/make-icons.py` 가 만든다. 디자인을 바꾸면 스크립트를 고치고 다시 실행한다. `og:image` 의 절대 주소는 빌드 때 `vite.config.js` 가 Vercel 의 배포 주소로 채운다. 검색 엔진에는 올리지 않는다(`noindex`).
