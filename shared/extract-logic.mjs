@@ -86,10 +86,11 @@ export function phonicsPrompt(words) {
   return (
     '단어: ' + list + '\n\n' +
     '이 목록에서 초등 4학년이 배우면 좋을 공통 파닉스 규칙을 최대 5개 뽑아줘. 목록에 2개 이상 해당되는 단어가 있는 규칙을 우선.\n' +
+    '규칙 하나 = 글자 조합 하나 = 소리 하나. "자음 블렌드", "자음 뭉치"처럼 여러 소리를 한 규칙으로 묶지 마.\n' +
     '규칙 하나에는 그 글자가 실제로 들어 있는 단어만 넣어. 억지로 채우지 말고, 맞는 단어가 없으면 규칙이 5개보다 적어도 괜찮아.\n' +
     'pattern: 규칙 이름 (예: -ture, -tion, igh, 매직 e)\n' +
-    'letters: 단어 안에서 확인할 영문자 조각들. 소문자, 모음 사이 자음 하나는 _ (예: ["ture"], ["tion","sion"], ["a_e"])\n' +
-    'sound: 한글로 쓴 소리 (예: 처)\n' +
+    'letters: 단어 안에서 확인할 영문자 조각. 최대 2개, 각 2~5글자, 소문자. 모음 사이 자음 하나는 _ (예: ["ture"], ["tion","sion"], ["a_e"])\n' +
+    'sound: 한글로 쓴 소리 하나 (예: 처). 쉼표로 여러 소리를 적지 마.\n' +
     'tip: 초등학생에게 하는 한 문장 설명\n' +
     'words: 목록 중 letters 가 실제로 들어 있는 단어들 (목록에 있는 철자 그대로)\n' +
     '형식: {"phonics":[{"pattern":"-ture","letters":["ture"],"sound":"처","tip":"...","words":["creature"]}]}\n' +
@@ -130,8 +131,12 @@ export function parseWordsResponse(message) {
 
 /* ── 파닉스 규칙 ↔ 단어 대조 ─────────────────────────────────────── */
 
+/** 한 규칙이 가질 수 있는 글자 조각 수. 이보다 많으면 여러 규칙을 묶은 것으로 본다 */
+export const MAX_LETTER_TOKENS = 3;
+
 /**
- * 확인용 글자 조각 정리. 소문자 영문자와 _ 만 남기고, 실제 글자 2개 이상인 조각만 유효하다.
+ * 확인용 글자 조각 정리. 소문자 영문자와 _ 만 남기고, 실제 글자 2~5개인 조각만 유효하다.
+ * (1글자는 어디에나 있어서 의미가 없고, 6글자 이상은 단어를 통째로 넘긴 것이다)
  * letters 가 없으면 pattern 문자열에서 영문자 덩어리를 뽑아 대신 쓴다 ("-tion / -sion" → ["tion","sion"]).
  * (예전에 저장된 단어장에는 letters 가 없다)
  */
@@ -141,9 +146,15 @@ export function normalizeLetters(letters, pattern) {
   const out = [];
   for (const raw of src) {
     const t = String(raw ?? '').toLowerCase().replace(/[^a-z_]/g, '');
-    if (t.replace(/_/g, '').length >= 2 && !out.includes(t)) out.push(t);
+    const real = t.replace(/_/g, '').length;
+    if (real >= 2 && real <= 5 && !out.includes(t)) out.push(t);
   }
   return out;
+}
+
+/** "크르, 클, 브르" 처럼 소리를 여러 개 적었으면 여러 규칙을 묶은 것이다 */
+export function isSingleSound(sound) {
+  return !/[,/·]/.test(String(sound ?? ''));
 }
 
 /** 조각을 정규식으로. "a_e" 의 _ 는 자음 하나 */
@@ -197,6 +208,7 @@ export function highlightChunks(chunks, letters) {
 /**
  * 파닉스 규칙 정리.
  * - pattern/sound 가 비면 버린다
+ * - 소리가 여러 개거나 글자 조각이 MAX_LETTER_TOKENS 를 넘으면 버린다 (여러 규칙을 묶은 "블렌드" 류)
  * - 단어장에 없는 단어는 뺀다 (철자는 단어장 기준으로 맞춘다)
  * - letters 가 실제로 들어 있지 않은 단어는 뺀다 (모델이 억지로 채운 것)
  * - 남는 단어가 없는 규칙은 버린다. 최대 5개
@@ -210,7 +222,9 @@ export function sanitizePhonics(raw, words) {
     const sound = String(item?.sound ?? '').trim();
     const tip = String(item?.tip ?? '').trim();
     if (!pattern || !sound) continue;
+    if (!isSingleSound(sound)) continue;
     const letters = normalizeLetters(item?.letters, pattern);
+    if (letters.length > MAX_LETTER_TOKENS) continue;
     const seen = new Set();
     const matched = [];
     for (const w of Array.isArray(item?.words) ? item.words : []) {

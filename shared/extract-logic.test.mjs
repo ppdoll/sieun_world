@@ -165,10 +165,36 @@ test('sanitizePhonics: letters 가 없으면 pattern 에서 글자를 뽑아 대
   assert.deepEqual(out[0].words, ['creature']);
 });
 
-test('normalizeLetters: 소문자·밑줄만 남기고 2글자 미만은 버린다', () => {
+test('normalizeLetters: 소문자·밑줄만 남기고 2글자 미만, 6글자 이상은 버린다', () => {
   assert.deepEqual(normalizeLetters(['TURE', 't', 'a_e', 'a_e', '-igh'], ''), ['ture', 'a_e', 'igh']);
+  assert.deepEqual(normalizeLetters(['ng', 'fascinating'], ''), ['ng']);
   assert.deepEqual(normalizeLetters([], '매직 e (a_e)'), ['a_e']);
   assert.deepEqual(normalizeLetters([], '묵음 c'), []);
+});
+
+test('sanitizePhonics: 여러 소리를 묶은 규칙(블렌드)과 조각이 너무 많은 규칙은 버린다', () => {
+  const words = [
+    ...WORDS,
+    { word: 'club', meaning: '막대기', chunks: ['club'] },
+    { word: 'brightly', meaning: '밝게', chunks: ['bright', 'ly'] },
+    { word: 'strength', meaning: '힘', chunks: ['strength'] },
+    { word: 'mate', meaning: '친구', chunks: ['mate'] },
+    { word: 'recognize', meaning: '알아보다', chunks: ['rec', 'og', 'nize'] },
+  ];
+  const out = sanitizePhonics(
+    [
+      { pattern: '자음 두 개 겹치기(블렌드)', letters: ['cr', 'cl', 'br', 'shr', 'str'], sound: '크르, 클, 브르, 슈르, 스트르', tip: '', words: ['creature', 'club', 'brightly', 'strength'] },
+      { pattern: '매직 e', letters: ['a_e', 'i_e'], sound: '에이, 아이', tip: '', words: ['mate', 'recognize'] },
+      { pattern: '자음 뭉치', letters: ['str', 'cl', 'br', 'cr'], sound: '스', tip: '', words: ['strength'] },
+      { pattern: '매직 e (a_e)', letters: ['a_e'], sound: '에이', tip: '', words: ['mate', 'recognize'] },
+      { pattern: 'ng', letters: ['ng', 'strength'], sound: '응', tip: '', words: ['strength', 'creature'] },
+    ],
+    words
+  );
+  assert.deepEqual(out.map((r) => r.pattern), ['매직 e (a_e)', 'ng']);
+  assert.deepEqual(out[0].words, ['mate']);
+  assert.deepEqual(out[1].letters, ['ng']);
+  assert.deepEqual(out[1].words, ['strength']);
 });
 
 test('wordMatchesLetters: _ 는 자음 하나. 조각이 없으면 확인 불가로 통과', () => {

@@ -41,6 +41,8 @@
 .wl-ghost:disabled{color:#B9CEDE;cursor:default}
 .wl-ghost.wl-sm{width:auto;padding:9px 14px;font-size:13px;border-radius:11px}
 .wl-row{display:flex;gap:8px;align-items:center}
+.wl-row>.wl-ghost{width:auto;flex:1}
+.wl-row>.wl-cta.wl-inline{flex:1.6}
 .wl-center{justify-content:center;flex-wrap:wrap}
 .wl-err{background:#FDECEA;color:#A33B2E;border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.6}
 .wl-bar{height:4px;background:var(--line);border-radius:4px;overflow:hidden}

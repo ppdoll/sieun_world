@@ -329,7 +329,7 @@ function Review({ words, truncated, onConfirm, onBack }) {
    2. 파닉스
    ──────────────────────────────────────────────────────────── */
 
-function Phonics({ phonics: rawPhonics, loading, words, onNext }) {
+function Phonics({ phonics: rawPhonics, loading, error, words, onNext, onRefresh }) {
   const byWord = Object.fromEntries(words.map((w) => [w.word, w]));
   // 서버가 이미 걸렀지만, 예전에 저장된 단어장에도 같은 기준을 적용한다 (규칙 글자가 없는 단어 제거)
   const phonics = sanitizePhonics(rawPhonics, words);
@@ -343,7 +343,8 @@ function Phonics({ phonics: rawPhonics, loading, words, onNext }) {
           <span />
         </div>
       )}
-      {!loading && phonics.length === 0 && (
+      {error && <div className="wl-err">{error}</div>}
+      {!loading && !error && phonics.length === 0 && (
         <div className="wl-err">규칙을 만들지 못했어요. 다음 단계로 넘어가도 괜찮아요.</div>
       )}
 
@@ -371,6 +372,12 @@ function Phonics({ phonics: rawPhonics, loading, words, onNext }) {
       <button className="wl-cta" onClick={onNext}>
         덩어리로 읽어보기
       </button>
+      {!loading && (
+        <button className="wl-ghost" onClick={onRefresh}>
+          규칙 다시 뽑기
+        </button>
+      )}
+      {!loading && <p className="wl-note">사진은 다시 읽지 않고 단어 목록으로만 규칙을 새로 만들어요. 아빠가 규칙이 이상할 때 눌러요.</p>}
     </div>
   );
 }
@@ -627,6 +634,7 @@ export default function WordLab() {
   const [pending, setPending] = useState({ words: [], truncated: false });
   const [phonics, setPhonics] = useState([]);
   const [phonicsLoading, setPhonicsLoading] = useState(false);
+  const [phonicsError, setPhonicsError] = useState('');
   const [wrongWords, setWrongWords] = useState([]);
   const [summary, setSummary] = useState(null);
   const [stage, setStage] = useState('quiz');
@@ -643,21 +651,28 @@ export default function WordLab() {
     setStep('check');
   }
 
-  async function start(w) {
-    setWords(w);
-    setPhonics([]);
-    persist(w, []);
-    setStep('phonics');
+  /** 단어 목록만 보내 규칙을 (다시) 만든다. 사진은 다시 읽지 않는다 */
+  async function loadPhonics(w) {
     setPhonicsLoading(true);
+    setPhonicsError('');
     try {
       const got = await extractPhonics(w);
       setPhonics(got.phonics || []);
       persist(w, got.phonics || []);
-    } catch {
-      setPhonics([]); // 규칙이 없어도 학습은 계속
+    } catch (e) {
+      // 규칙이 없어도 학습은 계속. 무엇이 잘못됐는지는 화면에 남긴다
+      setPhonicsError(e.message || '규칙을 만들지 못했어요. 다음 단계로 넘어가도 괜찮아요.');
     } finally {
       setPhonicsLoading(false);
     }
+  }
+
+  function start(w) {
+    setWords(w);
+    setPhonics([]);
+    persist(w, []);
+    setStep('phonics');
+    loadPhonics(w);
   }
 
   function resume() {
@@ -726,7 +741,14 @@ export default function WordLab() {
         )}
 
         {step === 'phonics' && (
-          <Phonics phonics={phonics} loading={phonicsLoading} words={words} onNext={() => setStep('chunks')} />
+          <Phonics
+            phonics={phonics}
+            loading={phonicsLoading}
+            error={phonicsError}
+            words={words}
+            onNext={() => setStep('chunks')}
+            onRefresh={() => loadPhonics(words)}
+          />
         )}
 
         {step === 'chunks' && <Chunks words={words} onNext={() => setStep('quiz')} />}
