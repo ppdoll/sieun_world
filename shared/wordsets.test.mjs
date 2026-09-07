@@ -30,14 +30,15 @@ test('addWordSet: 맨 앞에 넣고 최대 개수를 넘으면 오래된 것을 
   assert.equal(list[list.length - 1].at, 3000);
 });
 
-test('addWordSet: 같은 id 가 이미 있으면 교체하고 맨 앞으로 올린다', () => {
+test('addWordSet: 같은 id 가 이미 있으면 내용을 교체한다 (순서는 활동 순 그대로)', () => {
   const a = setAt(1000);
   const b = setAt(2000);
   const list = addWordSet(addWordSet([], a), b);
   const again = addWordSet(list, { ...a, phonics: [{ pattern: 'x' }] });
   assert.equal(again.length, 2);
-  assert.equal(again[0].id, a.id);
-  assert.equal(again[0].phonics.length, 1);
+  assert.equal(again[0].id, b.id);
+  assert.equal(again[1].id, a.id);
+  assert.equal(again[1].phonics.length, 1);
 });
 
 test('removeWordSet / findWordSet / updateWordSet', () => {
@@ -104,4 +105,44 @@ test('toRemoteWordSet: 필요한 필드만 남기고 이상한 값은 null', asy
   assert.equal(toRemoteWordSet({ id: 'x', words: [] }), null);
   assert.equal(toRemoteWordSet({ words: [W('a')] }), null);
   assert.equal(toRemoteWordSet(null), null);
+});
+
+test('markStudied / activityAt / sortByActivity: 공부한 오래된 단어장이 앞으로 온다', async () => {
+  const { markStudied, activityAt, sortByActivity } = await import('./wordsets.mjs');
+  const old = setAt(1000);
+  const recent = setAt(5000);
+  const list = markStudied([recent, old], old.id, 9000);
+  assert.equal(activityAt(list[1]), 9000);
+  assert.equal(activityAt(recent), 5000);
+  assert.deepEqual(sortByActivity(list).map((s) => s.at), [1000, 5000]);
+});
+
+test('addWordSet: 잘라낼 때 활동이 오래된 것부터 버린다 (공부한 옛 단어장은 남는다)', async () => {
+  const { markStudied } = await import('./wordsets.mjs');
+  let list = [];
+  for (let i = 1; i <= 3; i++) list = addWordSet(list, setAt(i * 1000), 3);
+  list = markStudied(list, list.find((s) => s.at === 1000).id, 99000); // 가장 오래된 것을 방금 공부
+  list = addWordSet(list, setAt(4000), 3);
+  assert.deepEqual(list.map((s) => s.at).sort(), [1000, 3000, 4000]); // 2000 이 밀려남
+});
+
+test('mergeWordSets: 공유 쪽 내용을 받되 이 기기의 공부 기록은 남긴다', async () => {
+  const { mergeWordSets } = await import('./wordsets.mjs');
+  const a = { ...setAt(1000), lastStudiedAt: 8000 };
+  const merged = mergeWordSets([a], [{ ...setAt(1000), phonics: [{ pattern: '-ture' }] }]);
+  assert.equal(merged[0].lastStudiedAt, 8000);
+  assert.equal(merged[0].phonics.length, 1);
+  assert.equal(merged[0].synced, true);
+});
+
+test('combineWordSets: 단어는 중복 없이, 규칙은 pattern 기준으로 하나만, 연상은 합친다', async () => {
+  const { combineWordSets } = await import('./wordsets.mjs');
+  const s1 = { ...setAt(1000, [W('creature'), W('vision')]), phonics: [{ pattern: '-ture' }, { pattern: '-sion' }], mnemonics: { creature: '크리처' } };
+  const s2 = { ...setAt(2000, [W('Vision'), W('insert')]), phonics: [{ pattern: '-TURE' }, { pattern: 'in-' }], mnemonics: { creature: '다른', insert: '인서트' } };
+  const c = combineWordSets([s1, s2, null]);
+  assert.deepEqual(c.words.map((w) => w.word), ['creature', 'vision', 'insert']);
+  assert.deepEqual(c.phonics.map((p) => p.pattern), ['-ture', '-sion', 'in-']);
+  assert.deepEqual(c.mnemonics, { creature: '크리처', insert: '인서트' });
+  assert.equal(c.count, 2);
+  assert.deepEqual(combineWordSets(null).words, []);
 });

@@ -25,6 +25,9 @@ import {
   findWordSet,
   wordSetTitle,
   mergeWordSets,
+  markStudied,
+  combineWordSets,
+  sortByActivity,
 } from '../shared/wordsets.mjs';
 
 /* ────────────────────────────────────────────────────────────
@@ -103,14 +106,26 @@ function Steps({ current, onJump, canJump }) {
    1. 사진 올리기
    ──────────────────────────────────────────────────────────── */
 
-function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove }) {
+function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove, onCombine }) {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [err, setErr] = useState('');
   const [needPasscode, setNeedPasscode] = useState(false);
   const [code, setCode] = useState(getPasscode());
+  const [selecting, setSelecting] = useState(false); // 묶어서 시험: 고르는 중
+  const [chosen, setChosen] = useState([]);
   const inputRef = useRef(null);
+
+  const chosenSets = sets.filter((s) => chosen.includes(s.id));
+  const chosenWordCount = combineWordSets(chosenSets).words.length;
+  function toggleChosen(id) {
+    setChosen((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
+  }
+  function stopSelecting() {
+    setSelecting(false);
+    setChosen([]);
+  }
 
   async function run() {
     setBusy(true);
@@ -218,22 +233,61 @@ function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove }) {
       {sets.length > 0 && !busy && (
         <div className="wl-sets">
           <div className="wl-sets-h">
-            지난 단어장 <span className="wl-sets-n">{sets.length} / {MAX_WORDSETS}</span>
-          </div>
-          {syncNote && <div className="wl-warn">{syncNote}</div>}
-          {sets.map((s) => (
-            <div className="wl-set" key={s.id}>
-              <button className="wl-set-main" onClick={() => onResume(s.id)}>
-                <span className="wl-set-t">{wordSetTitle(s)}</span>
-                <span className="wl-set-s">
-                  {s.words.length}개 단어 · 이어서 하기{s.synced ? ' · 다른 기기에도 있음' : ''}
-                </span>
+            <span>
+              지난 단어장 <span className="wl-sets-n">{sets.length} / {MAX_WORDSETS}</span>
+            </span>
+            {sets.length >= 2 && !selecting && (
+              <button className="wl-link" onClick={() => setSelecting(true)}>
+                묶어서 시험 보기
               </button>
-              <button className="wl-x" onClick={() => onRemove(s.id)} aria-label="이 단어장 지우기">
-                ×
+            )}
+          </div>
+          {selecting && <p className="wl-note">함께 시험 볼 단어장을 골라주세요. 같은 단어는 하나로 합쳐요.</p>}
+          {syncNote && <div className="wl-warn">{syncNote}</div>}
+          {sets.map((s) => {
+            const picked = chosen.includes(s.id);
+            return (
+              <div className={'wl-set' + (picked ? ' picked' : '')} key={s.id}>
+                <button
+                  className="wl-set-main"
+                  onClick={() => (selecting ? toggleChosen(s.id) : onResume(s.id))}
+                  aria-pressed={selecting ? picked : undefined}
+                >
+                  {selecting && <span className={'wl-set-check' + (picked ? ' on' : '')}>{picked ? '✓' : ''}</span>}
+                  <span className="wl-set-text">
+                    <span className="wl-set-t">{wordSetTitle(s)}</span>
+                    <span className="wl-set-s">
+                      {s.words.length}개 단어{selecting ? '' : ' · 이어서 하기'}
+                      {s.lastStudiedAt ? ' · 이 기기에서 공부함' : ''}
+                      {s.synced ? ' · 다른 기기에도 있음' : ''}
+                    </span>
+                  </span>
+                </button>
+                {!selecting && (
+                  <button className="wl-x" onClick={() => onRemove(s.id)} aria-label="이 단어장 지우기">
+                    ×
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {selecting && (
+            <div className="wl-row">
+              <button className="wl-ghost" onClick={stopSelecting}>
+                취소
+              </button>
+              <button
+                className="wl-cta wl-inline"
+                disabled={chosen.length === 0}
+                onClick={() => {
+                  onCombine(chosen);
+                  stopSelecting();
+                }}
+              >
+                {chosen.length === 0 ? '단어장을 골라주세요' : chosen.length + '개 묶어서 시험 (단어 ' + chosenWordCount + '개)'}
               </button>
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
@@ -679,7 +733,7 @@ function Assemble({ words, seed, onNext }) {
    3-3. 이야기 — 오늘 단어가 섞인 짧은 한국어 이야기 (재미, 시험과 무관)
    ──────────────────────────────────────────────────────────── */
 
-function Story({ story, loading, error, words, onNext, onRefresh }) {
+function Story({ story, loading, error, combined, words, onNext, onRefresh }) {
   const parts = splitStory(story, words);
   return (
     <div className="wl-pane">
@@ -692,6 +746,9 @@ function Story({ story, loading, error, words, onNext, onRefresh }) {
         </div>
       )}
       {error && <div className="wl-err">{error}</div>}
+      {combined && !story && (
+        <div className="wl-warn">여러 단어장을 묶었을 때는 이야기를 새로 만들지 않아요. 바로 시험으로 가요.</div>
+      )}
 
       {story && (
         <>
@@ -717,7 +774,7 @@ function Story({ story, loading, error, words, onNext, onRefresh }) {
       <button className="wl-cta" onClick={onNext}>
         시험 보러 가기
       </button>
-      {!loading && (
+      {!loading && !combined && (
         <button className="wl-ghost" onClick={onRefresh}>
           이야기 다시 만들기
         </button>
@@ -938,6 +995,7 @@ export default function WordLab() {
   const [sets, setSets] = useState([]);
   const setsRef = useRef([]); // 비동기 콜백(규칙 도착)에서 최신 목록을 보기 위한 거울
   const [currentId, setCurrentId] = useState(null);
+  const [combined, setCombined] = useState(0); // 묶어서 시험 중이면 묶은 단어장 수, 아니면 0
   const [syncNote, setSyncNote] = useState('');
   const [seedBump, setSeedBump] = useState(0);
 
@@ -952,11 +1010,12 @@ export default function WordLab() {
       .catch(() => {});
   }, []);
 
-  /** 목록 상태와 localStorage 를 함께 바꾼다 */
+  /** 목록 상태와 localStorage 를 함께 바꾼다. 항상 최근 활동(만든 때·공부한 때) 순으로 둔다 */
   function commitSets(next) {
-    setsRef.current = next;
-    setSets(next);
-    saveWordSets(next);
+    const sorted = sortByActivity(next);
+    setsRef.current = sorted;
+    setSets(sorted);
+    saveWordSets(sorted);
   }
 
   /** 단어장 하나를 공유 저장에 올린다 (같은 id 면 교체). 꺼져 있으면 조용히 넘어간다 */
@@ -1046,9 +1105,9 @@ export default function WordLab() {
     }
   }
 
-  // 이야기 화면에 처음 들어올 때 한 번만 만든다
+  // 이야기 화면에 처음 들어올 때 한 번만 만든다. 묶음 시험에서는 만들지 않는다(비용)
   useEffect(() => {
-    if (step === 'story' && !story && !storyLoading && !storyError && words.length) loadStory(words, currentId);
+    if (step === 'story' && !combined && !story && !storyLoading && !storyError && words.length) loadStory(words, currentId);
   }, [step]); // eslint-disable-line
 
   /** 검수를 마친 단어장으로 시작. 목록 맨 앞에 저장되고 오래된 것은 밀려난다 */
@@ -1056,25 +1115,52 @@ export default function WordLab() {
     const set = makeWordSet(w, []);
     commitSets(addWordSet(setsRef.current, set));
     setCurrentId(set.id);
+    setCombined(0);
     setWords(w);
     setPhonics([]);
     setMnemonics({});
     setStory('');
     setStoryError('');
+    setWrongWords([]);
     setStep('phonics');
     loadPhonics(w, set.id);
   }
 
+  /** 저장된 단어장 이어서 하기. 이 기기에서 공부한 기록을 남긴다 (공유에서 받은 것도 이 기기 것이 된다) */
   function resume(id) {
     const set = findWordSet(setsRef.current, id);
     if (!set) return;
+    commitSets(markStudied(setsRef.current, id));
     setCurrentId(id);
+    setCombined(0);
     setWords(set.words);
     setPhonics(set.phonics || []);
     setMnemonics(set.mnemonics || {});
     setStory(set.story || '');
     setStoryError('');
+    setWrongWords([]);
     setStep('phonics');
+  }
+
+  /** 여러 단어장을 묶어 바로 시험. 저장하지 않고, 각 단어장에 공부 기록만 남긴다 */
+  function combine(ids) {
+    const picked = ids.map((id) => findWordSet(setsRef.current, id)).filter(Boolean);
+    const c = combineWordSets(picked);
+    if (c.words.length === 0) return;
+    let next = setsRef.current;
+    for (const id of ids) next = markStudied(next, id);
+    commitSets(next);
+    setCurrentId(null);
+    setCombined(c.count);
+    setWords(c.words);
+    setPhonics(c.phonics);
+    setMnemonics(c.mnemonics);
+    setStory('');
+    setStoryError('');
+    setWrongWords([]);
+    setSeedBump((n) => n + 1);
+    setStage('quiz');
+    setStep('quiz');
   }
 
   /** 덩어리가 2개 이상인 단어가 하나도 없으면 조립 단계는 건너뛴다 */
@@ -1122,6 +1208,7 @@ export default function WordLab() {
     setWrongWords([]);
     setSummary(null);
     setCurrentId(null);
+    setCombined(0);
   }
 
   const shellStep = step === 'result' ? (stage === 'final' ? 'final' : stage) : step;
@@ -1149,6 +1236,7 @@ export default function WordLab() {
             syncNote={syncNote}
             onResume={resume}
             onRemove={remove}
+            onCombine={combine}
           />
         )}
 
@@ -1183,6 +1271,7 @@ export default function WordLab() {
             story={story}
             loading={storyLoading}
             error={storyError}
+            combined={combined > 0}
             words={words}
             onNext={() => setStep('quiz')}
             onRefresh={() => loadStory(words, currentId)}
@@ -1195,7 +1284,9 @@ export default function WordLab() {
             words={words}
             seed={11 + seedBump}
             title="1차 시험"
-            subtitle="틀려도 괜찮아요. 틀린 것만 따로 모아둘게요."
+            subtitle={
+              (combined ? '단어장 ' + combined + '개를 묶었어요. ' : '') + '틀려도 괜찮아요. 틀린 것만 따로 모아둘게요.'
+            }
             mnemonics={mnemonics}
             onDone={(r) => finishStage(r, 'quiz')}
           />
