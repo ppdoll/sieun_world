@@ -53,14 +53,16 @@ def chips(draw, x, y, parts, size, pad_x, pad_y, gap, colors=(CHIP_A, CHIP_B), i
 CHEEK = "#FF9DB3"
 
 
-def icon(size):
-    """앱 아이콘: 파란 바탕 위, 노란 힌트 칩에 얼굴을 붙인 캐릭터 (favicon.svg 와 같은 도안).
+def face(size, with_bg=True):
+    """노란 힌트 칩에 얼굴을 붙인 캐릭터 (favicon.svg 와 같은 도안). RGBA size×size.
+    with_bg=False 면 파란 바탕 없이 얼굴만 (OG 카드에 얹을 때).
     작은 크기에서도 눈·입이 읽히도록 4배로 그려서 줄인다."""
     S = size * 4
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     u = S / 64  # favicon.svg 의 64 단위 좌표를 그대로 쓴다
-    rounded(d, (0, 0, S, S), 15 * u, ACC)
+    if with_bg:
+        rounded(d, (0, 0, S, S), 15 * u, ACC)
     rounded(d, (7 * u, 13 * u, 57 * u, 53 * u), 14 * u, HL)
 
     def dot(cx, cy, r, fill):
@@ -82,6 +84,11 @@ def icon(size):
     return img.resize((size, size), Image.LANCZOS)
 
 
+def icon(size):
+    """앱 아이콘 = 파란 바탕 + 얼굴"""
+    return face(size, with_bg=True)
+
+
 def og():
     W, H = 1200, 630
     img = Image.new("RGB", (W, H), BG)
@@ -100,6 +107,9 @@ def og():
     rounded(d, (120, 470, 120 + tw + 48, 470 + 68), 16, HL)
     d.text((144, 478), mask, font=f, fill=INK)
     d.text((120 + tw + 72, 484), "앞의 4글자는 맞았어요", font=font(30), fill=INK2)
+    # 오른쪽에 얼굴 캐릭터 (파란 바탕 없이)
+    fc = face(300, with_bg=False)
+    img.paste(fc, (W - 60 - 300 - 20, (H - 300) // 2 + 10), fc)
     return img
 
 
