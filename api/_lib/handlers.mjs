@@ -41,7 +41,14 @@ export function describeModelError(err, Anthropic) {
   if (Anthropic && err instanceof Anthropic.RateLimitError) {
     return { status: 429, error: '지금은 너무 바빠요. 잠깐 뒤에 다시 눌러주세요.' };
   }
+  // 크레딧 부족은 400 으로 온다. 다시 눌러도 안 되는 문제이므로 아빠가 고쳐야 한다고 알린다
+  if (/credit balance|billing/i.test(String(err?.message ?? ''))) {
+    return { status: 402, error: '단어 읽기 요금이 다 떨어졌어요. 아빠가 충전해야 해요.' };
+  }
   if (Anthropic && err instanceof Anthropic.APIError) {
+    if (err.status === 400) {
+      return { status: 500, error: '서버 설정에 문제가 있어요. 아빠에게 알려주세요.' };
+    }
     return { status: 502, error: '단어를 읽는 곳이 응답하지 않았어요. 한 번 더 눌러주세요.' };
   }
   if (err && (err.name === 'AbortError' || /timeout/i.test(String(err.message)))) {

@@ -121,6 +121,23 @@ test('extract: SDK 오류는 종류별 상태코드와 아이용 문장으로 �
   }
 });
 
+test('describeModelError: 크레딧 부족은 402 와 충전 안내, 그 외 400 은 설정 문제로 알린다', () => {
+  const low = new APIError('400 {"type":"error","error":{"message":"Your credit balance is too low to access the Anthropic API."}}');
+  low.status = 400;
+  const r = describeModelError(low, FakeAnthropic);
+  assert.equal(r.status, 402);
+  assert.match(r.error, /충전/);
+  assert.doesNotMatch(r.error, /한 번 더/);
+
+  const bad = new APIError('400 invalid_request_error');
+  bad.status = 400;
+  assert.equal(describeModelError(bad, FakeAnthropic).status, 500);
+
+  const down = new APIError('529 overloaded');
+  down.status = 529;
+  assert.equal(describeModelError(down, FakeAnthropic).status, 502);
+});
+
 test('describeModelError: 시간 초과는 504, 알 수 없는 오류는 500', () => {
   assert.equal(describeModelError(new Error('Request timeout'), FakeAnthropic).status, 504);
   assert.equal(describeModelError(new Error('???'), FakeAnthropic).status, 500);
