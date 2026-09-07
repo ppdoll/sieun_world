@@ -85,8 +85,18 @@ def face(size, with_bg=True):
 
 
 def icon(size):
-    """앱 아이콘 = 파란 바탕 + 얼굴"""
+    """브라우저 탭용 아이콘 = 둥근 파란 바탕 + 얼굴 (모서리 투명)"""
     return face(size, with_bg=True)
+
+
+def icon_full(size, scale=0.8):
+    """홈 화면용 아이콘. 바탕을 사각형으로 꽉 채우고(투명 없음) 얼굴은 안쪽 safe zone(80%)에 둔다.
+    Android 는 이 판을 원·둥근 사각형으로 잘라 쓰고(maskable), iOS 는 자기 모서리를 씌운다."""
+    img = Image.new("RGBA", (size, size), ACC)
+    inner = int(size * scale)
+    f = face(inner, with_bg=False)
+    img.paste(f, ((size - inner) // 2, (size - inner) // 2), f)
+    return img.convert("RGB")
 
 
 def og():
@@ -116,7 +126,9 @@ def og():
 if __name__ == "__main__":
     icon(512).save(os.path.join(ROOT, "icon-512.png"))
     icon(192).save(os.path.join(ROOT, "icon-192.png"))
-    icon(180).save(os.path.join(ROOT, "apple-touch-icon.png"))
     icon(32).save(os.path.join(ROOT, "favicon-32.png"))
+    icon_full(512).save(os.path.join(ROOT, "icon-maskable-512.png"))
+    icon_full(192).save(os.path.join(ROOT, "icon-maskable-192.png"))
+    icon_full(180, scale=0.86).save(os.path.join(ROOT, "apple-touch-icon.png"))
     og().save(os.path.join(ROOT, "og.png"), optimize=True)
     print("written:", sorted(os.listdir(ROOT)))
