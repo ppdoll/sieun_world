@@ -253,13 +253,16 @@ WeakWord         wordId, missCount, lastMissedAt   ← 누적 오답
 - `meaning`은 책에 적힌 그대로 짧게, 품사 표시(`n.`, `v.`)는 제외
 - `chunks`는 이어붙이면 `word`와 철자가 정확히 일치해야 함
 
-**파닉스 추출** — 단어 목록 → 정확히 5개
+**파닉스 추출** — 단어 목록 → 최대 5개
 
 ```json
-{"phonics":[{"pattern":"-ture","sound":"처","tip":"...","words":["creature"]}]}
+{"phonics":[{"pattern":"-ture","letters":["ture"],"sound":"처","tip":"...","words":["creature"]}]}
 ```
 
-- 목록에 2개 이상 해당되는 규칙을 우선
+- 목록에 2개 이상 해당되는 규칙을 우선. 맞는 단어가 없으면 5개 미만이어도 된다 ("정확히 5개"를 요구하면 모델이 관계없는 단어를 끼워 넣어 채운다)
+- `letters`는 단어 안에서 확인할 글자 조각. `_`는 자음 하나(`a_e` = 매직 e)
+- 서버는 `letters`가 실제로 들어 있지 않은 단어를 규칙에서 빼고, 남는 단어가 없는 규칙은 버린다 (`sanitizePhonics`)
+- 화면의 형광 표시도 같은 `letters`로 계산한다 (`highlightChunks`)
 - `tip`은 초등학생에게 하는 한 문장
 
 ---

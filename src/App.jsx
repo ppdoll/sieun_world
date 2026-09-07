@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { buildQuiz, gradeAnswer, summarize, collectWrong, sanitizeWords } from '../shared/wordlab-logic.mjs';
-import { flagWords } from '../shared/extract-logic.mjs';
+import { flagWords, normalizeLetters, highlightChunks, sanitizePhonics } from '../shared/extract-logic.mjs';
 import { speak, initSpeech, hasEnglishVoice } from './speech.js';
 import { prepareImage, extractFromImage, extractPhonics, getPasscode, setPasscode } from './api.js';
 
@@ -26,12 +26,11 @@ function persist(words, phonics) {
    공용 조각
    ──────────────────────────────────────────────────────────── */
 
-function ChunkWord({ chunks, highlight, size = 'lg', onChunk }) {
-  const lower = (highlight || '').toLowerCase().replace(/[^a-z]/g, '');
+function ChunkWord({ chunks, marks, size = 'lg', onChunk }) {
   return (
     <span className={'wl-chunkrow wl-chunkrow-' + size}>
       {chunks.map((c, i) => {
-        const hit = lower && c.toLowerCase().includes(lower);
+        const hit = !!marks?.[i];
         return (
           <span
             key={i}
@@ -330,8 +329,10 @@ function Review({ words, truncated, onConfirm, onBack }) {
    2. 파닉스
    ──────────────────────────────────────────────────────────── */
 
-function Phonics({ phonics, loading, words, onNext }) {
+function Phonics({ phonics: rawPhonics, loading, words, onNext }) {
   const byWord = Object.fromEntries(words.map((w) => [w.word, w]));
+  // 서버가 이미 걸렀지만, 예전에 저장된 단어장에도 같은 기준을 적용한다 (규칙 글자가 없는 단어 제거)
+  const phonics = sanitizePhonics(rawPhonics, words);
   return (
     <div className="wl-pane">
       <h2 className="wl-h2">{loading ? '오늘 단어에 숨은 규칙을 찾는 중' : '오늘 단어에 숨은 규칙 ' + phonics.length + '개'}</h2>
@@ -356,9 +357,10 @@ function Phonics({ phonics, loading, words, onNext }) {
           <div className="wl-rule-words">
             {(p.words || []).map((w) => {
               const item = byWord[w] || { word: w, chunks: [w] };
+              const letters = normalizeLetters(p.letters, p.pattern);
               return (
                 <button key={w} className="wl-wordpill" onClick={() => speak(item.word)}>
-                  <ChunkWord chunks={item.chunks} highlight={p.pattern} size="sm" />
+                  <ChunkWord chunks={item.chunks} marks={highlightChunks(item.chunks, letters)} size="sm" />
                 </button>
               );
             })}

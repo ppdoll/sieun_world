@@ -7,6 +7,9 @@ import {
   parseWordsResponse,
   parsePhonicsResponse,
   sanitizePhonics,
+  normalizeLetters,
+  wordMatchesLetters,
+  highlightChunks,
   mergeWords,
   flagWords,
   WORDS_SCHEMA,
@@ -37,7 +40,9 @@ test('wordsPrompt: 상/하반부 요청은 첫 줄만 다르고 형식 지시는
 test('phonicsPrompt: 단어 목록을 쉼표로 이어 넣는다', () => {
   const p = phonicsPrompt(WORDS);
   assert.match(p, /creature, vision, coral reef/);
-  assert.match(p, /정확히 5개/);
+  assert.match(p, /최대 5개/);
+  assert.match(p, /억지로 채우지 말고/);
+  assert.match(p, /letters/);
 });
 
 test('messageText: text 블록만 이어붙이고 나머지는 무시한다', () => {
@@ -130,6 +135,59 @@ test('sanitizePhonics: pattern/sound 가 비거나 해당 단어가 없는 규�
   assert.deepEqual(sanitizePhonics('nope', WORDS), []);
 });
 
+test('sanitizePhonics: 규칙 글자가 실제로 없는 단어는 뺀다 (모델이 억지로 채운 것)', () => {
+  const words = [
+    ...WORDS,
+    { word: 'recognize', meaning: '알아보다', chunks: ['rec', 'og', 'nize'] },
+    { word: 'hunter', meaning: '사냥꾼', chunks: ['hunt', 'er'] },
+    { word: 'strength', meaning: '힘', chunks: ['strength'] },
+  ];
+  const out = sanitizePhonics(
+    [
+      { pattern: '-tion / -sion', letters: ['tion', 'sion'], sound: '션', tip: '', words: ['vision', 'recognize'] },
+      { pattern: '-ng / -nth 같은 자음 뭉치', letters: ['ng', 'nth'], sound: '응', tip: '', words: ['strength', 'hunter'] },
+      { pattern: '-ture', letters: ['ture'], sound: '처', tip: '', words: ['recognize'] },
+    ],
+    words
+  );
+  assert.equal(out.length, 2);
+  assert.deepEqual(out[0].words, ['vision']);
+  assert.deepEqual(out[0].letters, ['tion', 'sion']);
+  assert.deepEqual(out[1].words, ['strength']);
+});
+
+test('sanitizePhonics: letters 가 없으면 pattern 에서 글자를 뽑아 대조한다 (예전 저장분 호환)', () => {
+  const out = sanitizePhonics(
+    [{ pattern: '-ture / -ing 앞의 t', sound: '처', tip: '', words: ['creature', 'vision'] }],
+    WORDS
+  );
+  assert.deepEqual(out[0].letters, ['ture', 'ing']);
+  assert.deepEqual(out[0].words, ['creature']);
+});
+
+test('normalizeLetters: 소문자·밑줄만 남기고 2글자 미만은 버린다', () => {
+  assert.deepEqual(normalizeLetters(['TURE', 't', 'a_e', 'a_e', '-igh'], ''), ['ture', 'a_e', 'igh']);
+  assert.deepEqual(normalizeLetters([], '매직 e (a_e)'), ['a_e']);
+  assert.deepEqual(normalizeLetters([], '묵음 c'), []);
+});
+
+test('wordMatchesLetters: _ 는 자음 하나. 조각이 없으면 확인 불가로 통과', () => {
+  assert.equal(wordMatchesLetters('mate', ['a_e']), true);
+  assert.equal(wordMatchesLetters('recognize', ['a_e']), false);
+  assert.equal(wordMatchesLetters('recognize', ['i_e']), true);
+  assert.equal(wordMatchesLetters('coral reef', ['lr']), true);
+  assert.equal(wordMatchesLetters('anything', []), true);
+});
+
+test('highlightChunks: 조각이 걸리는 글자와 겹치는 덩어리만 켠다', () => {
+  assert.deepEqual(highlightChunks(['crea', 'ture'], ['ture']), [false, true]);
+  assert.deepEqual(highlightChunks(['ma', 'te', 'ri', 'al'], ['ter']), [false, true, true, false]);
+  assert.deepEqual(highlightChunks(['rec', 'og', 'nize'], ['tion', 'sion']), [false, false, false]);
+  assert.deepEqual(highlightChunks(['bright', 'ly'], ['igh']), [true, false]);
+  assert.deepEqual(highlightChunks(['mate'], []), [false]);
+  assert.deepEqual(highlightChunks(null, ['a']), []);
+});
+
 test('sanitizePhonics: 최대 5개', () => {
   const many = Array.from({ length: 8 }, (_, i) => ({
     pattern: 'p' + i,
@@ -199,5 +257,5 @@ test('flagWords: 입력이 배열이 아니면 빈 배열', () => {
 test('스키마: words / phonics 가 필수이고 추가 속성은 막는다', () => {
   assert.deepEqual(WORDS_SCHEMA.required, ['words']);
   assert.equal(WORDS_SCHEMA.additionalProperties, false);
-  assert.deepEqual(PHONICS_SCHEMA.properties.phonics.items.required, ['pattern', 'sound', 'tip', 'words']);
+  assert.deepEqual(PHONICS_SCHEMA.properties.phonics.items.required, ['pattern', 'letters', 'sound', 'tip', 'words']);
 });
