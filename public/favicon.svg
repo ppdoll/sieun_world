@@ -1,5 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#3D8BD3"/>
-  <rect x="9" y="21" width="21.5" height="22" rx="6" fill="#E3EDF6"/>
-  <rect x="33.5" y="21" width="21.5" height="22" rx="6" fill="#F7DDE4"/>
+  <!-- 파란 바탕 위, 앱의 노란 힌트 칩에 얼굴을 붙인 캐릭터 -->
+  <rect width="64" height="64" rx="15" fill="#3D8BD3"/>
+  <rect x="7" y="13" width="50" height="40" rx="14" fill="#FFE24A"/>
+  <!-- 볼 -->
+  <circle cx="17" cy="38" r="3.6" fill="#FF9DB3" opacity=".85"/>
+  <circle cx="47" cy="38" r="3.6" fill="#FF9DB3" opacity=".85"/>
+  <!-- 눈 -->
+  <circle cx="24" cy="30" r="3.8" fill="#16324F"/>
+  <circle cx="40" cy="30" r="3.8" fill="#16324F"/>
+  <circle cx="25.3" cy="28.8" r="1.2" fill="#fff"/>
+  <circle cx="41.3" cy="28.8" r="1.2" fill="#fff"/>
+  <!-- 입 -->
+  <path d="M25 39 Q32 46 39 39" fill="none" stroke="#16324F" stroke-width="3.2" stroke-linecap="round"/>
 </svg>

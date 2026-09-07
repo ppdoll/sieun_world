@@ -50,25 +50,36 @@ def chips(draw, x, y, parts, size, pad_x, pad_y, gap, colors=(CHIP_A, CHIP_B), i
     return cx - gap - x
 
 
+CHEEK = "#FF9DB3"
+
+
 def icon(size):
-    """앱 아이콘: 파란 바탕에 덩어리 칩 두 개."""
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    """앱 아이콘: 파란 바탕 위, 노란 힌트 칩에 얼굴을 붙인 캐릭터 (favicon.svg 와 같은 도안).
+    작은 크기에서도 눈·입이 읽히도록 4배로 그려서 줄인다."""
+    S = size * 4
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    rounded(d, (0, 0, size, size), size * 0.22, ACC)
-    s = size
-    gap = s * 0.04
-    h = s * 0.34
-    w = (s * 0.72 - gap) / 2
-    x0 = (s - (w * 2 + gap)) / 2
-    y0 = (s - h) / 2
-    rounded(d, (x0, y0, x0 + w, y0 + h), h * 0.28, CHIP_A)
-    rounded(d, (x0 + w + gap, y0, x0 + w * 2 + gap, y0 + h), h * 0.28, CHIP_B)
-    if size >= 96:
-        f = font(int(h * 0.62))
-        for txt, cx in (("ma", x0 + w / 2), ("te", x0 + w + gap + w / 2)):
-            tw = d.textlength(txt, font=f)
-            d.text((cx - tw / 2, y0 + h * 0.12), txt, font=f, fill=INK)
-    return img
+    u = S / 64  # favicon.svg 의 64 단위 좌표를 그대로 쓴다
+    rounded(d, (0, 0, S, S), 15 * u, ACC)
+    rounded(d, (7 * u, 13 * u, 57 * u, 53 * u), 14 * u, HL)
+
+    def dot(cx, cy, r, fill):
+        d.ellipse((cx * u - r * u, cy * u - r * u, cx * u + r * u, cy * u + r * u), fill=fill)
+
+    # 볼
+    dot(17, 38, 3.6, CHEEK)
+    dot(47, 38, 3.6, CHEEK)
+    # 눈 + 반짝임
+    dot(24, 30, 3.8, INK)
+    dot(40, 30, 3.8, INK)
+    dot(25.3, 28.8, 1.2, "#FFFFFF")
+    dot(41.3, 28.8, 1.2, "#FFFFFF")
+    # 입 (M25 39 Q32 46 39 39 와 같은 호)
+    d.arc((25 * u, 33.5 * u, 39 * u, 44.5 * u), start=15, end=165, fill=INK, width=int(3.2 * u))
+    for cx, cy in ((25, 39), (39, 39)):
+        dot(cx, cy, 1.6, INK)
+
+    return img.resize((size, size), Image.LANCZOS)
 
 
 def og():
