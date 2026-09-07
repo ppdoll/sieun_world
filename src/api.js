@@ -113,6 +113,11 @@ export function extractPhonics(words) {
   return post('/api/extract/phonics', { words });
 }
 
+/** 단어 목록 → { story, status, used }. story 가 '' 이면 만들지 못한 것 */
+export function extractStory(words) {
+  return post('/api/extract/story', { words });
+}
+
 /* ── 공유 저장 (git data 브랜치, 최근 5개). 다른 기기와 단어장을 나눈다 ── */
 
 /** → { sets, disabled? } */

@@ -135,6 +135,29 @@ body{background:#EDF3F8}
 .wl-x{background:none;border:none;color:var(--ink2);font-size:20px;line-height:1;padding:8px 6px;cursor:pointer;font-family:inherit}
 .wl-x:hover{color:var(--no)}
 
+/* ── 연상 한 줄 ── */
+.wl-mnemo{display:inline-flex;gap:8px;align-items:flex-start;background:#FFF7D6;border-radius:12px;padding:10px 14px;
+  font-size:14px;line-height:1.55;color:#6B5300;text-align:left;max-width:100%}
+.wl-mnemo-ico{flex:none}
+
+/* ── 덩어리 맞추기 ── */
+.wl-slots,.wl-pool{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%}
+.wl-slots{min-height:56px;padding:8px;border-radius:14px;background:#F3F8FC}
+.wl-slot{display:inline-block;min-width:60px;height:50px;border:2px dashed var(--line);border-radius:8px;background:#fff}
+.wl-slots .wl-chunk,.wl-poolchip{font-size:28px;padding:6px 12px;border:none;font-family:inherit;color:var(--ink);
+  cursor:pointer;line-height:1.2;border-radius:8px;font-weight:800}
+.wl-poolchip{background:#fff;border:2px solid var(--line)}
+.wl-poolchip:hover{border-color:var(--acc)}
+.wl-poolchip.used,.wl-poolchip:disabled{opacity:.25;cursor:default}
+.wl-pool-h{font-size:12.5px;color:var(--ink2);font-weight:700}
+
+/* ── 이야기 ── */
+.wl-story{background:var(--card);border-radius:18px;padding:22px 20px;font-size:19px;line-height:2;color:var(--ink);
+  word-break:keep-all;text-align:left}
+.wl-storyword{background:#E3EDF6;color:#1C5A8F;border:none;border-radius:8px;padding:2px 8px;margin:0 2px;font:inherit;
+  font-weight:800;cursor:pointer;line-height:1.4;vertical-align:baseline}
+.wl-storyword:hover{background:var(--hl)}
+
 /* ── 지난 단어장 목록 ── */
 .wl-sets{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .wl-sets-h{font-size:13px;font-weight:700;color:var(--ink2);padding:4px 4px 2px;display:flex;justify-content:space-between}

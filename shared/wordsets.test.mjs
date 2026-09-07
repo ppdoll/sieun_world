@@ -94,9 +94,13 @@ test('mergeWordSets: 같은 id 는 공유 쪽을 믿고 synced 표시, 최근 �
 
 test('toRemoteWordSet: 필요한 필드만 남기고 이상한 값은 null', async () => {
   const { toRemoteWordSet } = await import('./wordsets.mjs');
-  const s = { ...setAt(1000), synced: true, junk: 1 };
+  const s = { ...setAt(1000), synced: true, junk: 1, mnemonics: { creature: '크리-처!' }, story: 'creature 이야기' };
   const r = toRemoteWordSet(s);
-  assert.deepEqual(Object.keys(r).sort(), ['at', 'id', 'phonics', 'words']);
+  assert.deepEqual(Object.keys(r).sort(), ['at', 'id', 'mnemonics', 'phonics', 'story', 'words']);
+  assert.deepEqual(r.mnemonics, { creature: '크리-처!' });
+  assert.equal(r.story, 'creature 이야기');
+  assert.deepEqual(toRemoteWordSet(setAt(1000)).mnemonics, {});
+  assert.equal(toRemoteWordSet({ ...setAt(1000), mnemonics: ['bad'] }).mnemonics instanceof Array, false);
   assert.equal(toRemoteWordSet({ id: 'x', words: [] }), null);
   assert.equal(toRemoteWordSet({ words: [W('a')] }), null);
   assert.equal(toRemoteWordSet(null), null);

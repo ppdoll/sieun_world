@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { buildQuiz, gradeAnswer, summarize, collectWrong, sanitizeWords } from '../shared/wordlab-logic.mjs';
-import { flagWords, normalizeLetters, highlightChunks, sanitizePhonics } from '../shared/extract-logic.mjs';
-import { speak, initSpeech, hasEnglishVoice } from './speech.js';
+import { flagWords, normalizeLetters, highlightChunks, sanitizePhonics, splitStory } from '../shared/extract-logic.mjs';
+import { buildAssembly, gradeAssembly } from '../shared/assembly.mjs';
+import { speak, initSpeech, hasEnglishVoice, hasVoice } from './speech.js';
 import {
   prepareImage,
   extractFromImage,
   extractPhonics,
+  extractStory,
   getPasscode,
   setPasscode,
   fetchRemoteSets,
@@ -55,9 +57,9 @@ function ChunkWord({ chunks, marks, size = 'lg', onChunk }) {
   );
 }
 
-function SpeakBtn({ text, label = '듣기', rate = 0.8, big }) {
+function SpeakBtn({ text, label = '듣기', rate = 0.8, big, lang = 'en-US' }) {
   return (
-    <button className={'wl-speak' + (big ? ' wl-speak-big' : '')} onClick={() => speak(text, rate)}>
+    <button className={'wl-speak' + (big ? ' wl-speak-big' : '')} onClick={() => speak(text, rate, lang)}>
       <span className="wl-speak-ico">♪</span>
       {label}
     </button>
@@ -66,7 +68,9 @@ function SpeakBtn({ text, label = '듣기', rate = 0.8, big }) {
 
 function Steps({ current }) {
   const items = ['사진', '파닉스', '덩어리', '시험', '오답', '최종'];
-  const idx = { upload: 0, check: 0, phonics: 1, chunks: 2, quiz: 3, review: 4, final: 5, done: 5 }[current] ?? 0;
+  // 조립·이야기는 "덩어리" 단계 안의 연습이므로 같은 칸에 둔다 (칸을 늘리면 폰에서 글자가 깨진다)
+  const idx =
+    { upload: 0, check: 0, phonics: 1, chunks: 2, assemble: 2, story: 2, quiz: 3, review: 4, final: 5, done: 5 }[current] ?? 0;
   return (
     <ol className="wl-steps">
       {items.map((label, i) => (
@@ -404,7 +408,18 @@ function Phonics({ phonics: rawPhonics, loading, error, words, onNext, onRefresh
    3. 덩어리 읽기
    ──────────────────────────────────────────────────────────── */
 
-function Chunks({ words, onNext }) {
+/** 연상 한 줄. 없으면 아무것도 그리지 않는다 */
+function Mnemonic({ tip }) {
+  if (!tip) return null;
+  return (
+    <div className="wl-mnemo">
+      <span className="wl-mnemo-ico">💡</span>
+      <span>{tip}</span>
+    </div>
+  );
+}
+
+function Chunks({ words, mnemonics, onNext }) {
   const [i, setI] = useState(0);
   const w = words[i];
   const last = i === words.length - 1;
@@ -427,6 +442,7 @@ function Chunks({ words, onNext }) {
       <div className="wl-stage">
         <ChunkWord chunks={w.chunks} onChunk={(c) => speak(c, 0.6)} />
         <div className="wl-meaning">{w.meaning}</div>
+        <Mnemonic tip={mnemonics?.[w.word]} />
         <div className="wl-row">
           <SpeakBtn text={w.word} label="듣기" big />
           <SpeakBtn text={w.word} label="천천히" rate={0.5} big />
@@ -440,7 +456,7 @@ function Chunks({ words, onNext }) {
         </button>
         {last ? (
           <button className="wl-cta wl-inline" onClick={onNext}>
-            시험 보러 가기
+            덩어리 맞추기
           </button>
         ) : (
           <button className="wl-cta wl-inline" onClick={() => setI(i + 1)}>
@@ -453,12 +469,184 @@ function Chunks({ words, onNext }) {
 }
 
 /* ────────────────────────────────────────────────────────────
+   3-2. 덩어리 맞추기 — 섞인 덩어리를 순서대로 눌러 단어를 만든다 (연습, 채점 없음)
+   ──────────────────────────────────────────────────────────── */
+
+function Assemble({ words, seed, onNext }) {
+  const [items] = useState(() => buildAssembly(words, { seed }));
+  const [i, setI] = useState(0);
+  const [picked, setPicked] = useState([]); // 누른 순서대로의 pool 인덱스
+  const [judged, setJudged] = useState(null);
+  const item = items[i];
+  const last = i === items.length - 1;
+
+  if (!item) return null;
+  // 이전 단어의 인덱스가 한 렌더 동안 남을 수 있으므로(다음 단어의 덩어리 수가 더 적을 때) 없는 칩은 건너뛴다
+  const pickedChunks = picked.map((k) => item.pool[k]?.c ?? '');
+
+  /** 다음 단어로. 누른 칩과 판정을 같은 렌더에서 함께 비운다 */
+  function goNext() {
+    if (last) return onNext();
+    setPicked([]);
+    setJudged(null);
+    setI(i + 1);
+  }
+
+  function pick(k) {
+    if (judged || picked.includes(k)) return;
+    speak(item.pool[k].c, 0.6);
+    const next = [...picked, k];
+    setPicked(next);
+    if (next.length === item.chunks.length) {
+      const g = gradeAssembly(item.chunks, next.map((x) => item.pool[x].c));
+      setJudged(g);
+      if (g.correct) setTimeout(() => speak(item.word), 450);
+    }
+  }
+  function unpick(pos) {
+    if (judged) return;
+    setPicked(picked.filter((_, p) => p !== pos));
+  }
+  function retry() {
+    setPicked([]);
+    setJudged(null);
+  }
+
+  return (
+    <div className="wl-pane">
+      <div className="wl-quizhead">
+        <span className="wl-badge">덩어리 맞추기</span>
+        <span className="wl-count">
+          {i + 1} / {items.length}
+        </span>
+      </div>
+      <p className="wl-sub">뜻을 보고 덩어리를 순서대로 눌러 단어를 만들어요. 누르면 그 덩어리 소리가 나요.</p>
+
+      <div className="wl-stage">
+        <div className="wl-prompt">{item.meaning}</div>
+
+        <div className="wl-slots" aria-label="만든 단어">
+          {item.chunks.map((_, pos) =>
+            pos < picked.length ? (
+              <button
+                key={pos}
+                className={'wl-chunk ' + (pos % 2 ? 'wl-chunk-b' : 'wl-chunk-a')}
+                onClick={() => unpick(pos)}
+                aria-label={pickedChunks[pos] + ' 빼기'}
+              >
+                {pickedChunks[pos]}
+              </button>
+            ) : (
+              <span key={pos} className="wl-slot" />
+            )
+          )}
+        </div>
+
+        {!judged && (
+          <>
+            <div className="wl-pool">
+              {item.pool.map((p, k) => (
+                <button
+                  key={k}
+                  className={'wl-poolchip' + (picked.includes(k) ? ' used' : '')}
+                  disabled={picked.includes(k)}
+                  onClick={() => pick(k)}
+                >
+                  {p.c}
+                </button>
+              ))}
+            </div>
+            <div className="wl-row wl-center">
+              <SpeakBtn text={item.word} label="듣기" />
+              <button className="wl-ghost wl-sm" disabled={picked.length === 0} onClick={retry}>
+                처음부터
+              </button>
+            </div>
+          </>
+        )}
+
+        {judged && (
+          <div className={'wl-verdict ' + (judged.correct ? 'ok' : 'no')}>
+            <div className="wl-verdict-t">{judged.correct ? '맞았어요' : '정답을 볼까요'}</div>
+            <ChunkWord chunks={item.chunks} onChunk={(c) => speak(c, 0.6)} />
+            {!judged.correct && judged.matchedChunks > 0 && (
+              <p className="wl-note">앞의 {judged.matchedChunks}덩어리는 맞았어요. 뒤만 다시 보면 돼요.</p>
+            )}
+            <div className="wl-row">
+              {!judged.correct && (
+                <button className="wl-ghost" onClick={retry}>
+                  다시 맞추기
+                </button>
+              )}
+              <button className="wl-cta wl-inline" onClick={goNext}>
+                {last ? '이야기 보러 가기' : '다음'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   3-3. 이야기 — 오늘 단어가 섞인 짧은 한국어 이야기 (재미, 시험과 무관)
+   ──────────────────────────────────────────────────────────── */
+
+function Story({ story, loading, error, words, onNext, onRefresh }) {
+  const parts = splitStory(story, words);
+  return (
+    <div className="wl-pane">
+      <h2 className="wl-h2">{loading ? '오늘 단어로 이야기를 만드는 중' : '오늘 단어로 만든 이야기'}</h2>
+      <p className="wl-sub">파란 단어를 누르면 소리가 나요. 시험에는 안 나오는 재미 시간이에요.</p>
+
+      {loading && (
+        <div className="wl-bar">
+          <span />
+        </div>
+      )}
+      {error && <div className="wl-err">{error}</div>}
+
+      {story && (
+        <>
+          <div className="wl-story">
+            {parts.map((p, k) =>
+              p.word ? (
+                <button key={k} className="wl-storyword" onClick={() => speak(p.word)}>
+                  {p.text}
+                </button>
+              ) : (
+                <span key={k}>{p.text}</span>
+              )
+            )}
+          </div>
+          {hasVoice('ko') && (
+            <div className="wl-row wl-center">
+              <SpeakBtn text={story} label="이야기 듣기" rate={0.95} lang="ko-KR" />
+            </div>
+          )}
+        </>
+      )}
+
+      <button className="wl-cta" onClick={onNext}>
+        시험 보러 가기
+      </button>
+      {!loading && (
+        <button className="wl-ghost" onClick={onRefresh}>
+          이야기 다시 만들기
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
    4·5·6. 시험 / 오답 / 최종
    ──────────────────────────────────────────────────────────── */
 
 const TYPE_LABEL = { spell: '뜻 보고 쓰기', listen: '듣고 쓰기', meaning: '뜻 고르기' };
 
-function Quiz({ words, seed, title, subtitle, onDone }) {
+function Quiz({ words, seed, title, subtitle, mnemonics, onDone }) {
   // 영어 목소리가 없는 기기에서는 받아쓰기 유형을 뺀다 (README §7)
   const [quiz] = useState(() =>
     buildQuiz(words, { seed, types: hasEnglishVoice() ? ['spell', 'listen', 'meaning'] : ['spell', 'meaning'] })
@@ -587,6 +775,7 @@ function Quiz({ words, seed, title, subtitle, onDone }) {
             {!judged.correct && judged.matched > 0 && (
               <p className="wl-note">앞의 {judged.matched}글자는 맞았어요. 뒷부분만 다시 보면 돼요.</p>
             )}
+            <Mnemonic tip={mnemonics?.[q.word]} />
             <button className="wl-cta" onClick={next}>
               {i === quiz.length - 1 ? '결과 보기' : '다음'}
             </button>
@@ -653,6 +842,10 @@ export default function WordLab() {
   const [phonics, setPhonics] = useState([]);
   const [phonicsLoading, setPhonicsLoading] = useState(false);
   const [phonicsError, setPhonicsError] = useState('');
+  const [mnemonics, setMnemonics] = useState({});
+  const [story, setStory] = useState('');
+  const [storyLoading, setStoryLoading] = useState(false);
+  const [storyError, setStoryError] = useState('');
   const [wrongWords, setWrongWords] = useState([]);
   const [summary, setSummary] = useState(null);
   const [stage, setStage] = useState('quiz');
@@ -706,8 +899,10 @@ export default function WordLab() {
     try {
       const got = await extractPhonics(w);
       const rules = got.phonics || [];
+      const tips = got.mnemonics || {};
       setPhonics(rules);
-      commitSets(updateWordSet(setsRef.current, id, { phonics: rules }));
+      setMnemonics(tips);
+      commitSets(updateWordSet(setsRef.current, id, { phonics: rules, mnemonics: tips }));
     } catch (e) {
       // 규칙이 없어도 학습은 계속. 무엇이 잘못됐는지는 화면에 남긴다
       setPhonicsError(e.message || '규칙을 만들지 못했어요. 다음 단계로 넘어가도 괜찮아요.');
@@ -718,6 +913,31 @@ export default function WordLab() {
     }
   }
 
+  /** 이야기를 (다시) 만든다. 단어장에 저장되어 다음에는 부르지 않는다 */
+  async function loadStory(w, id) {
+    setStoryLoading(true);
+    setStoryError('');
+    try {
+      const got = await extractStory(w);
+      if (got.story) {
+        setStory(got.story);
+        commitSets(updateWordSet(setsRef.current, id, { story: got.story }));
+        syncSet(id);
+      } else {
+        setStoryError('이야기를 만들지 못했어요. 시험으로 넘어가도 괜찮아요.');
+      }
+    } catch (e) {
+      setStoryError(e.message || '이야기를 만들지 못했어요. 시험으로 넘어가도 괜찮아요.');
+    } finally {
+      setStoryLoading(false);
+    }
+  }
+
+  // 이야기 화면에 처음 들어올 때 한 번만 만든다
+  useEffect(() => {
+    if (step === 'story' && !story && !storyLoading && !storyError && words.length) loadStory(words, currentId);
+  }, [step]); // eslint-disable-line
+
   /** 검수를 마친 단어장으로 시작. 목록 맨 앞에 저장되고 오래된 것은 밀려난다 */
   function start(w) {
     const set = makeWordSet(w, []);
@@ -725,6 +945,9 @@ export default function WordLab() {
     setCurrentId(set.id);
     setWords(w);
     setPhonics([]);
+    setMnemonics({});
+    setStory('');
+    setStoryError('');
     setStep('phonics');
     loadPhonics(w, set.id);
   }
@@ -735,7 +958,15 @@ export default function WordLab() {
     setCurrentId(id);
     setWords(set.words);
     setPhonics(set.phonics || []);
+    setMnemonics(set.mnemonics || {});
+    setStory(set.story || '');
+    setStoryError('');
     setStep('phonics');
+  }
+
+  /** 덩어리가 2개 이상인 단어가 하나도 없으면 조립 단계는 건너뛴다 */
+  function afterChunks() {
+    setStep(words.some((w) => Array.isArray(w.chunks) && w.chunks.length >= 2) ? 'assemble' : 'story');
   }
 
   function remove(id) {
@@ -821,7 +1052,20 @@ export default function WordLab() {
           />
         )}
 
-        {step === 'chunks' && <Chunks words={words} onNext={() => setStep('quiz')} />}
+        {step === 'chunks' && <Chunks words={words} mnemonics={mnemonics} onNext={afterChunks} />}
+
+        {step === 'assemble' && <Assemble words={words} seed={7} onNext={() => setStep('story')} />}
+
+        {step === 'story' && (
+          <Story
+            story={story}
+            loading={storyLoading}
+            error={storyError}
+            words={words}
+            onNext={() => setStep('quiz')}
+            onRefresh={() => loadStory(words, currentId)}
+          />
+        )}
 
         {step === 'quiz' && (
           <Quiz
@@ -830,6 +1074,7 @@ export default function WordLab() {
             seed={11 + seedBump}
             title="1차 시험"
             subtitle="틀려도 괜찮아요. 틀린 것만 따로 모아둘게요."
+            mnemonics={mnemonics}
             onDone={(r) => finishStage(r, 'quiz')}
           />
         )}
@@ -841,6 +1086,7 @@ export default function WordLab() {
             seed={29 + seedBump}
             title="오답 복습"
             subtitle="아까 놓친 것만 모았어요."
+            mnemonics={mnemonics}
             onDone={(r) => finishStage(r, 'review')}
           />
         )}
@@ -852,6 +1098,7 @@ export default function WordLab() {
             seed={97 + seedBump}
             title="최종 시험"
             subtitle="전체 단어를 순서 바꿔서 한 번에."
+            mnemonics={mnemonics}
             onDone={(r) => finishStage(r, 'final')}
           />
         )}

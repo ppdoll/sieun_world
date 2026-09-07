@@ -112,3 +112,28 @@ test('extractPhonicsRules: 응답이 이상해도 빈 배열로 끝난다', asyn
   const r = await extractPhonicsRules({ words: [W('creature', '생명체', ['creature'])], callModel });
   assert.deepEqual(r.phonics, []);
 });
+
+test('extractStory: 약한 이야기(단어 2개 미만)면 한 번만 다시 묻는다', async () => {
+  const words = [W('creature', '생명체', ['crea', 'ture']), W('vision', '시력', ['vi', 'sion']), W('insert', '넣다', ['in', 'sert'])];
+  const { extractStory } = await import('./extract-service.mjs');
+  const { callModel, prompts } = fakeModel([
+    reply({ story: 'creature만 나오는 이야기' }),
+    reply({ story: 'creature가 vision을 insert했어요.' }),
+  ]);
+  const r = await extractStory({ words, callModel });
+  assert.equal(r.status, 'ok');
+  assert.deepEqual(r.used, ['creature', 'vision', 'insert']);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[0], /creature\(생명체\)/);
+});
+
+test('extractStory: 두 번 다 약하면 weak 로 끝내고, 거절이면 즉시 끝', async () => {
+  const words = [W('creature', '생명체', ['crea', 'ture']), W('vision', '시력', ['vi', 'sion'])];
+  const { extractStory } = await import('./extract-service.mjs');
+  let m = fakeModel([reply({ story: '아무 단어도 없어요' }), reply({ story: '역시 없어요' })]);
+  assert.equal((await extractStory({ words, callModel: m.callModel })).status, 'weak');
+  m = fakeModel([{ content: [], stop_reason: 'refusal' }]);
+  const r = await extractStory({ words, callModel: m.callModel });
+  assert.equal(r.status, 'refused');
+  assert.equal(m.prompts.length, 1);
+});

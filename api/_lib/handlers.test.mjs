@@ -177,3 +177,49 @@ test('phonics: 비밀번호 검사도 같이 적용된다', async () => {
   await handler(mockReq({ body: { words: WORDS } }), res);
   assert.equal(res.statusCode, 401);
 });
+
+test('story: 정상 경로 — 200 과 이야기, 쓰인 단어 목록', async () => {
+  const { makeStoryHandler } = await import('./handlers.mjs');
+  const words = [
+    { word: 'creature', meaning: '생명체', chunks: ['crea', 'ture'] },
+    { word: 'vision', meaning: '시력', chunks: ['vi', 'sion'] },
+  ];
+  const handler = makeStoryHandler({
+    callModel: async () => ({
+      content: [{ type: 'text', text: JSON.stringify({ story: 'creature가 vision을 잃었어요.' }) }],
+      stop_reason: 'end_turn',
+    }),
+  });
+  const res = mockRes();
+  await handler(mockReq({ body: { words } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, 'ok');
+  assert.match(res.body.story, /creature/);
+  assert.deepEqual(res.body.used, ['creature', 'vision']);
+});
+
+test('story: 단어가 없으면 400, 비밀번호 검사 적용, 모델 오류는 문구로', async () => {
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    const { makeStoryHandler } = await import('./handlers.mjs');
+    let res = mockRes();
+    await makeStoryHandler({ callModel: okModel([]) })(mockReq({ body: { words: [] } }), res);
+    assert.equal(res.statusCode, 400);
+
+    res = mockRes();
+    await makeStoryHandler({ callModel: okModel([]), passcode: 'x' })(mockReq({ body: { words: WORDS } }), res);
+    assert.equal(res.statusCode, 401);
+
+    res = mockRes();
+    await makeStoryHandler({
+      callModel: async () => {
+        throw new RateLimitError('x');
+      },
+      Anthropic: FakeAnthropic,
+    })(mockReq({ body: { words: WORDS } }), res);
+    assert.equal(res.statusCode, 429);
+  } finally {
+    console.error = origError;
+  }
+});

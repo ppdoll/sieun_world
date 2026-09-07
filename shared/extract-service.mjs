@@ -9,10 +9,14 @@ import {
   WORDS_SYSTEM,
   PHONICS_SCHEMA,
   PHONICS_SYSTEM,
+  STORY_SCHEMA,
+  STORY_SYSTEM,
   wordsPrompt,
   phonicsPrompt,
+  storyPrompt,
   parseWordsResponse,
   parsePhonicsResponse,
+  parseStoryResponse,
   mergeWords,
 } from './extract-logic.mjs';
 
@@ -64,7 +68,7 @@ export async function extractWordsFromImage({ image, callModel }) {
   return { status: second.status, words: [], split: false, calls };
 }
 
-/** 단어 목록 → 파닉스 규칙 (최대 5개). 실패하면 빈 배열 — 학습은 계속된다 */
+/** 단어 목록 → 파닉스 규칙 (최대 5개) + 단어별 연상 한 줄. 실패하면 빈 값 — 학습은 계속된다 */
 export async function extractPhonicsRules({ words, callModel }) {
   const message = await callModel({
     system: PHONICS_SYSTEM,
@@ -72,4 +76,21 @@ export async function extractPhonicsRules({ words, callModel }) {
     content: [{ type: 'text', text: phonicsPrompt(words) }],
   });
   return parsePhonicsResponse(message, words);
+}
+
+/** 단어 목록 → 단어가 섞인 짧은 한국어 이야기. 약하면(단어 2개 미만) 한 번 더 묻는다 */
+export async function extractStory({ words, callModel }) {
+  const ask = async () =>
+    parseStoryResponse(
+      await callModel({
+        system: STORY_SYSTEM,
+        schema: STORY_SCHEMA,
+        content: [{ type: 'text', text: storyPrompt(words) }],
+        maxTokens: 2000,
+      }),
+      words
+    );
+  const first = await ask();
+  if (first.status === 'ok' || first.status === 'refused') return first;
+  return ask();
 }

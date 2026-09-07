@@ -285,3 +285,67 @@ test('스키마: words / phonics 가 필수이고 추가 속성은 막는다', (
   assert.equal(WORDS_SCHEMA.additionalProperties, false);
   assert.deepEqual(PHONICS_SCHEMA.properties.phonics.items.required, ['pattern', 'letters', 'sound', 'tip', 'words']);
 });
+
+test('sanitizeMnemonics: 단어장 단어만, 빈 tip 은 버리고, 길이를 자른다', async () => {
+  const { sanitizeMnemonics, MAX_MNEMONIC_CHARS } = await import('./extract-logic.mjs');
+  const out = sanitizeMnemonics(
+    [
+      { word: 'Creature', tip: '  크리-처!   괴물이  처억 나타났어요 ' },
+      { word: 'vision', tip: '' },
+      { word: 'nothere', tip: '없는 단어' },
+      { word: 'coral reef', tip: 'x'.repeat(200) },
+    ],
+    WORDS
+  );
+  assert.deepEqual(Object.keys(out), ['creature', 'coral reef']);
+  assert.equal(out.creature, '크리-처! 괴물이 처억 나타났어요');
+  assert.equal(out['coral reef'].length, MAX_MNEMONIC_CHARS);
+  assert.deepEqual(sanitizeMnemonics(null, WORDS), {});
+});
+
+test('parsePhonicsResponse: mnemonics 도 함께 돌려주고, 없으면 빈 객체', () => {
+  const r = parsePhonicsResponse(
+    msg(JSON.stringify({ phonics: [], mnemonics: [{ word: 'vision', tip: '비전! 눈에 비친 전망' }] })),
+    WORDS
+  );
+  assert.deepEqual(r.mnemonics, { vision: '비전! 눈에 비친 전망' });
+  assert.deepEqual(parsePhonicsResponse(msg(JSON.stringify({ phonics: [] })), WORDS).mnemonics, {});
+  assert.deepEqual(parsePhonicsResponse(null, WORDS).mnemonics, {});
+});
+
+test('storyPrompt: 단어와 뜻을 함께 넣고 한국어 이야기를 요구한다', async () => {
+  const { storyPrompt } = await import('./extract-logic.mjs');
+  const p = storyPrompt(WORDS);
+  assert.match(p, /creature\(생명체\)/);
+  assert.match(p, /한국어로/);
+  assert.match(p, /철자 그대로/);
+});
+
+test('storyWordsUsed / splitStory: 이야기 속 영어 단어를 찾아 조각으로 나눈다', async () => {
+  const { storyWordsUsed, splitStory } = await import('./extract-logic.mjs');
+  const story = 'Coral reef에 사는 creature가 vision을 잃었어요. creatures는 세지 않아요.';
+  assert.deepEqual(storyWordsUsed(story, WORDS), ['coral reef', 'creature', 'vision']);
+  const parts = splitStory(story, WORDS);
+  assert.deepEqual(parts.slice(0, 3), [
+    { text: 'Coral reef', word: 'coral reef' },
+    { text: '에 사는 ' },
+    { text: 'creature', word: 'creature' },
+  ]);
+  assert.equal(parts.filter((p) => p.word).length, 3, 'creatures 는 단어 경계가 아니므로 칩이 아니다');
+  assert.equal(parts.map((p) => p.text).join(''), story);
+  assert.deepEqual(splitStory('', WORDS), []);
+  assert.deepEqual(splitStory('그냥 글', []), [{ text: '그냥 글' }]);
+});
+
+test('parseStoryResponse: 단어가 2개 이상 들어가면 ok, 아니면 weak, 마크다운은 벗긴다', async () => {
+  const { parseStoryResponse, MAX_STORY_CHARS } = await import('./extract-logic.mjs');
+  const ok = parseStoryResponse(msg(JSON.stringify({ story: '**creature**가 vision을 얻었어요.' })), WORDS);
+  assert.equal(ok.status, 'ok');
+  assert.equal(ok.story, 'creature가 vision을 얻었어요.');
+  assert.deepEqual(ok.used, ['creature', 'vision']);
+
+  assert.equal(parseStoryResponse(msg(JSON.stringify({ story: 'creature만 나와요.' })), WORDS).status, 'weak');
+  assert.equal(parseStoryResponse(msg(JSON.stringify({ story: 'creature vision ' + 'x'.repeat(MAX_STORY_CHARS) })), WORDS).status, 'weak');
+  assert.equal(parseStoryResponse(msg('???'), WORDS).status, 'unparsable');
+  assert.equal(parseStoryResponse({ content: [], stop_reason: 'refusal' }, WORDS).status, 'refused');
+});

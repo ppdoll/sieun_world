@@ -45,10 +45,36 @@ export const PHONICS_SCHEMA = {
         additionalProperties: false,
       },
     },
+    // 단어마다 한 줄 연상 요령. 소리(덩어리)와 뜻을 잇는 우스운 한국어 한 문장
+    mnemonics: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          word: { type: 'string' },
+          tip: { type: 'string' },
+        },
+        required: ['word', 'tip'],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ['phonics'],
+  required: ['phonics', 'mnemonics'],
   additionalProperties: false,
 };
+
+export const STORY_SCHEMA = {
+  type: 'object',
+  properties: { story: { type: 'string' } },
+  required: ['story'],
+  additionalProperties: false,
+};
+
+export const STORY_SYSTEM =
+  'You write very short, funny Korean stories for a Korean 4th grader, embedding the given English words verbatim. Return JSON only.';
+
+export const MAX_STORY_CHARS = 600;
+export const MAX_MNEMONIC_CHARS = 80;
 
 /* ── 프롬프트 ───────────────────────────────────────────────────── */
 
@@ -93,7 +119,29 @@ export function phonicsPrompt(words) {
     'sound: 한글로 쓴 소리 하나 (예: 처). 쉼표로 여러 소리를 적지 마.\n' +
     'tip: 초등학생에게 하는 한 문장 설명\n' +
     'words: 목록 중 letters 가 실제로 들어 있는 단어들 (목록에 있는 철자 그대로)\n' +
-    '형식: {"phonics":[{"pattern":"-ture","letters":["ture"],"sound":"처","tip":"...","words":["creature"]}]}\n' +
+    '\n' +
+    '그리고 mnemonics 에 목록의 모든 단어마다 연상 요령을 하나씩 넣어줘.\n' +
+    'word: 단어 (목록에 있는 철자 그대로)\n' +
+    'tip: 소리(덩어리)와 뜻을 잇는 우스운 한국어 한 문장, 30자 안팎. 초등 4학년이 읽고 웃을 수 있게.\n' +
+    '     예: scissors → "씨-써-스! 가위가 종이를 써억 자르는 소리"\n' +
+    '형식: {"phonics":[{"pattern":"-ture","letters":["ture"],"sound":"처","tip":"...","words":["creature"]}],' +
+    '"mnemonics":[{"word":"creature","tip":"..."}]}\n' +
+    'JSON만 출력.'
+  );
+}
+
+/**
+ * 이야기 프롬프트. 한국어 문장 속에 영어 단어를 철자 그대로 넣는다.
+ * 아이가 영어 문장을 읽을 수는 없으므로 이야기는 한국어, 단어만 영어다.
+ */
+export function storyPrompt(words) {
+  const list = (words ?? []).map((w) => w.word + '(' + w.meaning + ')').join(', ');
+  return (
+    '단어: ' + list + '\n\n' +
+    '이 단어들 중 5~8개를 넣어 초등 4학년이 읽고 웃을 짧은 이야기를 한국어로 써줘. 3~4문장, 200자 안.\n' +
+    '영어 단어는 번역하지 말고 철자 그대로 영어로 넣어. 예: "coral reef에 사는 creature가 scissors를 들고 나타났어요."\n' +
+    '단어는 목록에 있는 철자 그대로 쓰고, 대문자로 바꾸거나 복수형으로 바꾸지 마.\n' +
+    '형식: {"story":"..."}\n' +
     'JSON만 출력.'
   );
 }
@@ -241,15 +289,97 @@ export function sanitizePhonics(raw, words) {
   return out;
 }
 
-/** 파닉스 응답 해석. 실패해도 학습은 이어져야 하므로 항상 배열을 돌려준다 */
+/**
+ * 연상 요령 정리 → { [단어장 철자]: tip }. 단어장에 없는 단어, 빈 tip 은 버리고 길이를 자른다.
+ */
+export function sanitizeMnemonics(raw, words) {
+  const out = {};
+  if (!Array.isArray(raw)) return out;
+  const byKey = new Map((words ?? []).map((w) => [String(w.word).toLowerCase().trim(), w.word]));
+  for (const item of raw) {
+    const canonical = byKey.get(String(item?.word ?? '').toLowerCase().trim());
+    const tip = String(item?.tip ?? '').trim().replace(/\s+/g, ' ');
+    if (!canonical || !tip || out[canonical]) continue;
+    out[canonical] = [...tip].slice(0, MAX_MNEMONIC_CHARS).join('');
+  }
+  return out;
+}
+
+/** 파닉스 응답 해석. 실패해도 학습은 이어져야 하므로 항상 배열/객체를 돌려준다 */
 export function parsePhonicsResponse(message, words) {
-  if (!message || message.stop_reason === 'refusal') return { status: 'refused', phonics: [] };
+  if (!message || message.stop_reason === 'refusal') return { status: 'refused', phonics: [], mnemonics: {} };
   const parsed = extractJson(messageText(message));
-  if (!parsed) return { status: 'unparsable', phonics: [] };
+  if (!parsed) return { status: 'unparsable', phonics: [], mnemonics: {} };
   return {
     status: message.stop_reason === 'max_tokens' ? 'truncated' : 'ok',
     phonics: sanitizePhonics(parsed.phonics, words),
+    mnemonics: sanitizeMnemonics(parsed.mnemonics, words),
   };
+}
+
+/* ── 이야기 ─────────────────────────────────────────────────────── */
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** 이야기 속 영어 단어를 찾는 정규식. 긴 단어(coral reef)부터, 앞뒤에 영문자가 붙지 않은 것만 */
+function wordsRegex(words) {
+  const list = (words ?? []).map((w) => String(w.word).trim()).filter(Boolean);
+  if (list.length === 0) return null;
+  list.sort((a, b) => b.length - a.length);
+  return new RegExp('(?<![a-zA-Z])(' + list.map(escapeRegex).join('|') + ')(?![a-zA-Z])', 'gi');
+}
+
+/** 이야기에 실제로 들어간 단어들 (단어장 철자로) */
+export function storyWordsUsed(story, words) {
+  const re = wordsRegex(words);
+  if (!re) return [];
+  const byKey = new Map((words ?? []).map((w) => [String(w.word).toLowerCase().trim(), w.word]));
+  const used = [];
+  for (const m of String(story ?? '').matchAll(re)) {
+    const canonical = byKey.get(m[1].toLowerCase());
+    if (canonical && !used.includes(canonical)) used.push(canonical);
+  }
+  return used;
+}
+
+/**
+ * 이야기를 화면용 조각으로 나눈다. [{ text }] 또는 [{ text, word }] (word 는 단어장 철자).
+ * 영어 단어 조각은 칩으로 그리고 누르면 소리가 난다.
+ */
+export function splitStory(story, words) {
+  const text = String(story ?? '');
+  const re = wordsRegex(words);
+  if (!re) return text ? [{ text }] : [];
+  const byKey = new Map((words ?? []).map((w) => [String(w.word).toLowerCase().trim(), w.word]));
+  const out = [];
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    if (m.index > last) out.push({ text: text.slice(last, m.index) });
+    out.push({ text: m[0], word: byKey.get(m[1].toLowerCase()) ?? m[0] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last) });
+  return out;
+}
+
+/**
+ * 이야기 응답 해석. 단어가 2개 미만 들어갔거나 너무 길면 쓰지 않는다.
+ * status: 'ok' | 'refused' | 'unparsable' | 'weak'
+ */
+export function parseStoryResponse(message, words) {
+  if (!message || message.stop_reason === 'refusal') return { status: 'refused', story: '', used: [] };
+  const parsed = extractJson(messageText(message));
+  const story = String(parsed?.story ?? '')
+    .replace(/[*_#`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!parsed || !story) return { status: 'unparsable', story: '', used: [] };
+  const used = storyWordsUsed(story, words);
+  const need = Math.min(2, (words ?? []).length);
+  if (used.length < need || [...story].length > MAX_STORY_CHARS) return { status: 'weak', story: '', used };
+  return { status: 'ok', story, used };
 }
 
 /** 여러 번의 추출 결과 합치기 (중복 단어는 먼저 나온 것을 남긴다). 뜻이 빈 항목도 검수를 위해 남긴다 */

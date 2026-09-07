@@ -2,7 +2,7 @@
 // Vercel 서버리스 함수의 본체. (req, res) 를 받는 핸들러를 만들어 돌려준다.
 // callModel 과 passcode 를 주입받으므로 SDK 없이 테스트할 수 있다.
 
-import { extractWordsFromImage, extractPhonicsRules } from '../../shared/extract-service.mjs';
+import { extractWordsFromImage, extractPhonicsRules, extractStory } from '../../shared/extract-service.mjs';
 
 export const MAX_IMAGE_BASE64 = 3_000_000; // 약 2.2MB. Vercel 요청 본문 한도(4.5MB) 안쪽
 export const MAX_PHONICS_WORDS = 80;
@@ -98,24 +98,32 @@ export function makeExtractHandler({ callModel, passcode, Anthropic } = {}) {
   };
 }
 
+/** body.words 를 정리한다. 없으면 400 을 보내고 null */
+function wordsFromBody(body, res) {
+  const words = Array.isArray(body.words)
+    ? body.words
+        .filter((w) => w && typeof w.word === 'string' && w.word.trim())
+        .map((w) => ({ word: w.word.trim(), meaning: String(w.meaning ?? '').trim(), chunks: w.chunks }))
+        .slice(0, MAX_PHONICS_WORDS)
+    : [];
+  if (words.length === 0) {
+    send(res, 400, { error: '단어가 없어요. 먼저 사진에서 단어를 뽑아주세요.' });
+    return null;
+  }
+  return words;
+}
+
 /**
  * POST /api/extract/phonics
  * body: { words: [{ word, meaning, chunks }] }
- * 200: { phonics: [...], status }
+ * 200: { phonics: [...], mnemonics: { word: tip }, status }
  */
 export function makePhonicsHandler({ callModel, passcode, Anthropic } = {}) {
   return async function phonicsHandler(req, res) {
     const body = gate(req, res, passcode);
     if (!body) return;
-
-    const words = Array.isArray(body.words)
-      ? body.words
-          .filter((w) => w && typeof w.word === 'string' && w.word.trim())
-          .slice(0, MAX_PHONICS_WORDS)
-      : [];
-    if (words.length === 0) {
-      return send(res, 400, { error: '단어가 없어요. 먼저 사진에서 단어를 뽑아주세요.' });
-    }
+    const words = wordsFromBody(body, res);
+    if (!words) return;
 
     try {
       const result = await extractPhonicsRules({ words, callModel });
@@ -123,6 +131,29 @@ export function makePhonicsHandler({ callModel, passcode, Anthropic } = {}) {
     } catch (err) {
       const { status, error } = describeModelError(err, Anthropic);
       console.error('[phonics]', err?.status ?? '', err?.message ?? err);
+      return send(res, status, { error });
+    }
+  };
+}
+
+/**
+ * POST /api/extract/story
+ * body: { words: [{ word, meaning, chunks }] }
+ * 200: { story, status, used }   — 만들지 못했으면 story 는 '' (학습은 계속)
+ */
+export function makeStoryHandler({ callModel, passcode, Anthropic } = {}) {
+  return async function storyHandler(req, res) {
+    const body = gate(req, res, passcode);
+    if (!body) return;
+    const words = wordsFromBody(body, res);
+    if (!words) return;
+
+    try {
+      const result = await extractStory({ words, callModel });
+      return send(res, 200, result);
+    } catch (err) {
+      const { status, error } = describeModelError(err, Anthropic);
+      console.error('[story]', err?.status ?? '', err?.message ?? err);
       return send(res, status, { error });
     }
   };

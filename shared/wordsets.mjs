@@ -66,11 +66,17 @@ export function mergeWordSets(local, remote, max = MAX_WORDSETS) {
 export function toRemoteWordSet(set) {
   if (!set || typeof set.id !== 'string' || !set.id) return null;
   if (!Array.isArray(set.words) || set.words.length === 0) return null;
+  const mnemonics =
+    set.mnemonics && typeof set.mnemonics === 'object' && !Array.isArray(set.mnemonics)
+      ? Object.fromEntries(Object.entries(set.mnemonics).slice(0, 100))
+      : {};
   return {
     id: set.id,
     at: Number(set.at) || Date.now(),
     words: set.words.slice(0, 100),
     phonics: Array.isArray(set.phonics) ? set.phonics.slice(0, 5) : [],
+    mnemonics,
+    story: typeof set.story === 'string' ? set.story.slice(0, 600) : '',
   };
 }
 
