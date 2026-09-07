@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { buildQuiz, gradeAnswer, summarize, collectWrong, sanitizeWords } from '../shared/wordlab-logic.mjs';
 import { flagWords, normalizeLetters, highlightChunks, sanitizePhonics, splitStory } from '../shared/extract-logic.mjs';
 import { buildAssembly, gradeAssembly } from '../shared/assembly.mjs';
+import { parseWordLines } from '../shared/manual-entry.mjs';
 import { speak, initSpeech, hasEnglishVoice, hasVoice } from './speech.js';
 import {
   prepareImage,
@@ -66,19 +67,34 @@ function SpeakBtn({ text, label = '듣기', rate = 0.8, big, lang = 'en-US' }) {
   );
 }
 
-function Steps({ current }) {
+const STEP_KEYS = ['upload', 'phonics', 'chunks', 'quiz', 'review', 'final'];
+
+/** 상단 단계 표시. 번호를 누르면 그 단계로 바로 간다 (갈 수 없는 단계는 눌리지 않는다) */
+function Steps({ current, onJump, canJump }) {
   const items = ['사진', '파닉스', '덩어리', '시험', '오답', '최종'];
   // 조립·이야기는 "덩어리" 단계 안의 연습이므로 같은 칸에 둔다 (칸을 늘리면 폰에서 글자가 깨진다)
   const idx =
     { upload: 0, check: 0, phonics: 1, chunks: 2, assemble: 2, story: 2, quiz: 3, review: 4, final: 5, done: 5 }[current] ?? 0;
   return (
     <ol className="wl-steps">
-      {items.map((label, i) => (
-        <li key={label} className={'wl-step ' + (i < idx ? 'done' : i === idx ? 'now' : 'todo')}>
-          <span className="wl-step-n">{i < idx ? '✓' : i + 1}</span>
-          <span className="wl-step-l">{label}</span>
-        </li>
-      ))}
+      {items.map((label, i) => {
+        const key = STEP_KEYS[i];
+        const enabled = canJump ? canJump(key) : false;
+        return (
+          <li key={label} className={'wl-step ' + (i < idx ? 'done' : i === idx ? 'now' : 'todo')}>
+            <button
+              type="button"
+              className="wl-step-btn"
+              disabled={!enabled}
+              onClick={() => onJump && onJump(key)}
+              aria-label={label + ' 단계로 가기'}
+            >
+              <span className="wl-step-n">{i < idx ? '✓' : i + 1}</span>
+              <span className="wl-step-l">{label}</span>
+            </button>
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -87,7 +103,7 @@ function Steps({ current }) {
    1. 사진 올리기
    ──────────────────────────────────────────────────────────── */
 
-function Upload({ onExtracted, sets, syncNote, onResume, onRemove }) {
+function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove }) {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -187,6 +203,18 @@ function Upload({ onExtracted, sets, syncNote, onResume, onRemove }) {
         </div>
       )}
 
+      {!busy && (
+        <button className="wl-ghost" onClick={onManual}>
+          사진 없이 직접 넣기
+        </button>
+      )}
+
+      {!busy && (
+        <p className="wl-note">
+          단어장은 이 기기(브라우저)에 저장돼요. 다른 기기에도 올라간 것은 "다른 기기에도 있음"이라고 표시돼요.
+        </p>
+      )}
+
       {sets.length > 0 && !busy && (
         <div className="wl-sets">
           <div className="wl-sets-h">
@@ -234,12 +262,23 @@ function rowToWord(r) {
   return { word, meaning: r.meaning.trim(), chunks: chunks.length ? chunks : [word] };
 }
 
-function Review({ words, truncated, onConfirm, onBack }) {
+const blankRow = () => ({ word: '', meaning: '', chunksText: '' });
+const isBlankRow = (r) => !r.word.trim() && !r.meaning.trim() && !r.chunksText.trim();
+
+function Review({ words, truncated, manual, onConfirm, onBack }) {
   const [rows, setRows] = useState(() =>
-    words.map((w) => ({ word: w.word, meaning: w.meaning, chunksText: w.chunks.join('-') }))
+    manual ? [blankRow()] : words.map((w) => ({ word: w.word, meaning: w.meaning, chunksText: w.chunks.join('-') }))
   );
   const [err, setErr] = useState('');
-  const flags = flagWords(rows.map(rowToWord));
+  const [paste, setPaste] = useState('');
+  const [pasteOpen, setPasteOpen] = useState(!!manual);
+  // 완전히 빈 줄은 아직 안 쓴 줄이므로 표시하지 않는다
+  const flags = rows.map((r, i) => (isBlankRow(r) ? [] : flagWords([rowToWord(r)])[0]));
+  const dupFlags = flagWords(rows.map(rowToWord)); // 뜻 중복은 전체를 봐야 한다
+  rows.forEach((r, i) => {
+    if (!isBlankRow(r) && dupFlags[i].includes('dup-meaning') && !flags[i].includes('dup-meaning')) flags[i].push('dup-meaning');
+  });
+  const liveCount = rows.filter((r) => !isBlankRow(r)).length;
   const flaggedCount = flags.filter((f) => f.length).length;
 
   function update(i, key, value) {
@@ -249,15 +288,31 @@ function Review({ words, truncated, onConfirm, onBack }) {
     setRows((rs) => rs.filter((_, j) => j !== i));
   }
   function add() {
-    setRows((rs) => [...rs, { word: '', meaning: '', chunksText: '' }]);
+    setRows((rs) => [...rs, blankRow()]);
+  }
+  /** 여러 줄 붙여넣기 → 행으로. 빈 줄은 치우고 뒤에 붙인다 */
+  function applyPaste() {
+    const parsed = parseWordLines(paste);
+    if (parsed.length === 0) {
+      setErr('읽을 수 있는 줄이 없어요. 한 줄에 "creature 생명체"처럼 영어 단어와 뜻을 적어주세요.');
+      return;
+    }
+    setRows((rs) => [
+      ...rs.filter((r) => !isBlankRow(r)),
+      ...parsed.map((p) => ({ word: p.word, meaning: p.meaning, chunksText: p.chunks.join('-') })),
+    ]);
+    setPaste('');
+    setPasteOpen(false);
+    setErr('');
   }
   function confirm() {
-    const blanks = flags.filter((f) => f.includes('empty-word') || f.includes('empty-meaning')).length;
+    const live = rows.filter((r) => !isBlankRow(r));
+    const blanks = live.filter((r) => !r.word.trim() || !r.meaning.trim()).length;
     if (blanks > 0) {
       setErr('빈 칸이 ' + blanks + '줄 있어요. 채우거나 그 줄을 지워주세요.');
       return;
     }
-    const clean = sanitizeWords(rows.map(rowToWord));
+    const clean = sanitizeWords(live.map(rowToWord));
     if (clean.length === 0) {
       setErr('단어가 하나도 없어요. 단어와 뜻을 채워주세요.');
       return;
@@ -268,10 +323,39 @@ function Review({ words, truncated, onConfirm, onBack }) {
 
   return (
     <div className="wl-pane">
-      <h2 className="wl-h2">뽑은 단어 {rows.length}개를 확인해 주세요</h2>
+      <h2 className="wl-h2">{manual ? '단어를 직접 넣어주세요' : '뽑은 단어 ' + liveCount + '개를 확인해 주세요'}</h2>
       <p className="wl-sub">
-        틀린 뜻을 그대로 두면 아이가 틀린 답을 외워요. 칸을 눌러 바로 고칠 수 있어요. 덩어리는 <b>-</b>로 나눠 적어요.
+        {manual
+          ? '표에 바로 적거나, 아래에 여러 줄을 붙여 넣어요. 덩어리는 -로 나눠 적어요 (crea-ture).'
+          : '틀린 뜻을 그대로 두면 아이가 틀린 답을 외워요. 칸을 눌러 바로 고칠 수 있어요. 덩어리는 -로 나눠 적어요.'}
       </p>
+
+      {pasteOpen ? (
+        <div className="wl-pastebox">
+          <textarea
+            className="wl-paste"
+            rows={6}
+            value={paste}
+            placeholder={'한 줄에 하나씩\ncrea-ture 생명체\nmantis shrimp 갯가재\nbright-ly 밝게, 선명하게'}
+            onChange={(e) => setPaste(e.target.value)}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <div className="wl-row">
+            <button className="wl-ghost" onClick={() => setPasteOpen(false)}>
+              닫기
+            </button>
+            <button className="wl-cta wl-inline" disabled={!paste.trim()} onClick={applyPaste}>
+              표에 넣기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button className="wl-ghost wl-sm" onClick={() => setPasteOpen(true)}>
+          여러 줄 붙여넣기
+        </button>
+      )}
       {truncated && (
         <div className="wl-err">사진 한 장에 단어가 너무 많아서 일부를 놓쳤을 수 있어요. 빠진 단어는 아래에서 직접 추가해 주세요.</div>
       )}
@@ -335,9 +419,11 @@ function Review({ words, truncated, onConfirm, onBack }) {
 
       {err && <div className="wl-err">{err}</div>}
 
+      <p className="wl-note">시작을 누르면 이 단어장이 이 기기(브라우저)에 저장돼요.</p>
+
       <div className="wl-row">
         <button className="wl-ghost" onClick={onBack}>
-          사진 다시 고르기
+          {manual ? '처음으로' : '사진 다시 고르기'}
         </button>
         <button className="wl-cta wl-inline" onClick={confirm}>
           이대로 시작
@@ -838,7 +924,7 @@ function Result({ summary, words, mode, onNext, onRetry }) {
 export default function WordLab() {
   const [step, setStep] = useState('upload');
   const [words, setWords] = useState([]);
-  const [pending, setPending] = useState({ words: [], truncated: false });
+  const [pending, setPending] = useState({ words: [], truncated: false, manual: false });
   const [phonics, setPhonics] = useState([]);
   const [phonicsLoading, setPhonicsLoading] = useState(false);
   const [phonicsError, setPhonicsError] = useState('');
@@ -888,8 +974,35 @@ export default function WordLab() {
   }
 
   function onExtracted(w, truncated) {
-    setPending({ words: w, truncated });
+    setPending({ words: w, truncated, manual: false });
     setStep('check');
+  }
+
+  /** 사진 없이 표에 직접 적어 단어장을 만든다 */
+  function startManual() {
+    setPending({ words: [], truncated: false, manual: true });
+    setStep('check');
+  }
+
+  /** 단계 번호를 눌러 이동할 수 있는가 */
+  function canJump(key) {
+    if (words.length === 0) return false;
+    if (key === 'review') return wrongWords.length > 0;
+    return true;
+  }
+
+  /** 단계 번호로 바로 이동. 시험류는 새 문제지로 다시 시작한다 */
+  function jump(key) {
+    if (!canJump(key)) return;
+    if (key === 'upload') {
+      reset();
+      return;
+    }
+    if (key === 'quiz' || key === 'review' || key === 'final') {
+      setSeedBump((n) => n + 1);
+      setStage(key);
+    }
+    setStep(key);
   }
 
   /** 단어 목록만 보내 규칙을 (다시) 만든다. 사진은 다시 읽지 않는다 */
@@ -1026,16 +1139,25 @@ export default function WordLab() {
           )}
         </header>
 
-        {showSteps && <Steps current={shellStep} />}
+        {showSteps && <Steps current={shellStep} onJump={jump} canJump={canJump} />}
 
         {step === 'upload' && (
-          <Upload onExtracted={onExtracted} sets={sets} syncNote={syncNote} onResume={resume} onRemove={remove} />
+          <Upload
+            onExtracted={onExtracted}
+            onManual={startManual}
+            sets={sets}
+            syncNote={syncNote}
+            onResume={resume}
+            onRemove={remove}
+          />
         )}
 
         {step === 'check' && (
           <Review
+            key={pending.manual ? 'manual' : 'photo'}
             words={pending.words}
             truncated={pending.truncated}
+            manual={pending.manual}
             onConfirm={start}
             onBack={() => setStep('upload')}
           />

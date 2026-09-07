@@ -13,6 +13,10 @@
 .wl-step-n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;
   background:#fff;border:1.5px solid var(--line);color:var(--ink2)}
 .wl-step-l{font-size:10px;color:var(--ink2)}
+.wl-step-btn{background:none;border:none;padding:2px 0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-family:inherit;width:100%;border-radius:10px}
+.wl-step-btn:disabled{cursor:default}
+.wl-step-btn:not(:disabled):hover .wl-step-n{border-color:var(--acc)}
 .wl-step.now .wl-step-n{background:var(--acc);border-color:var(--acc);color:#fff}
 .wl-step.now .wl-step-l{color:var(--acc);font-weight:700}
 .wl-step.done .wl-step-n{background:var(--ok);border-color:var(--ok);color:#fff}
@@ -169,6 +173,12 @@ body{background:#EDF3F8}
 .wl-set-t{font-size:15px;font-weight:800}
 .wl-set-s{font-size:12.5px;color:var(--ink2)}
 .wl-set .wl-x{padding:0 14px;border-left:1.5px solid var(--line)}
+
+/* ── 여러 줄 붙여넣기 ── */
+.wl-pastebox{display:flex;flex-direction:column;gap:8px}
+.wl-paste{width:100%;border:2px solid var(--line);border-radius:14px;padding:12px 14px;font-size:15px;line-height:1.7;
+  font-family:inherit;color:var(--ink);background:#FBFDFF;resize:vertical}
+.wl-paste:focus{outline:none;border-color:var(--acc)}
 
 /* ── 비밀번호 ── */
 .wl-passbox{background:var(--card);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
