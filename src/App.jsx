@@ -2,7 +2,16 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { buildQuiz, gradeAnswer, summarize, collectWrong, sanitizeWords } from '../shared/wordlab-logic.mjs';
 import { flagWords, normalizeLetters, highlightChunks, sanitizePhonics } from '../shared/extract-logic.mjs';
 import { speak, initSpeech, hasEnglishVoice } from './speech.js';
-import { prepareImage, extractFromImage, extractPhonics, getPasscode, setPasscode } from './api.js';
+import {
+  prepareImage,
+  extractFromImage,
+  extractPhonics,
+  getPasscode,
+  setPasscode,
+  fetchRemoteSets,
+  pushRemoteSet,
+  deleteRemoteSet,
+} from './api.js';
 import { loadWordSets, saveWordSets } from './storage.js';
 import {
   MAX_WORDSETS,
@@ -12,6 +21,7 @@ import {
   updateWordSet,
   findWordSet,
   wordSetTitle,
+  mergeWordSets,
 } from '../shared/wordsets.mjs';
 
 /* ────────────────────────────────────────────────────────────
@@ -73,7 +83,7 @@ function Steps({ current }) {
    1. 사진 올리기
    ──────────────────────────────────────────────────────────── */
 
-function Upload({ onExtracted, sets, onResume, onRemove }) {
+function Upload({ onExtracted, sets, syncNote, onResume, onRemove }) {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -178,11 +188,14 @@ function Upload({ onExtracted, sets, onResume, onRemove }) {
           <div className="wl-sets-h">
             지난 단어장 <span className="wl-sets-n">{sets.length} / {MAX_WORDSETS}</span>
           </div>
+          {syncNote && <div className="wl-warn">{syncNote}</div>}
           {sets.map((s) => (
             <div className="wl-set" key={s.id}>
               <button className="wl-set-main" onClick={() => onResume(s.id)}>
                 <span className="wl-set-t">{wordSetTitle(s)}</span>
-                <span className="wl-set-s">{s.words.length}개 단어 · 이어서 하기</span>
+                <span className="wl-set-s">
+                  {s.words.length}개 단어 · 이어서 하기{s.synced ? ' · 다른 기기에도 있음' : ''}
+                </span>
               </button>
               <button className="wl-x" onClick={() => onRemove(s.id)} aria-label="이 단어장 지우기">
                 ×
@@ -646,11 +659,18 @@ export default function WordLab() {
   const [sets, setSets] = useState([]);
   const setsRef = useRef([]); // 비동기 콜백(규칙 도착)에서 최신 목록을 보기 위한 거울
   const [currentId, setCurrentId] = useState(null);
+  const [syncNote, setSyncNote] = useState('');
   const [seedBump, setSeedBump] = useState(0);
 
   useEffect(() => {
     commitSets(loadWordSets());
     initSpeech();
+    // 다른 기기에서 올린 단어장을 받아와 합친다. 실패해도 이 기기 것으로 계속
+    fetchRemoteSets()
+      .then((r) => {
+        if (Array.isArray(r?.sets) && r.sets.length) commitSets(mergeWordSets(setsRef.current, r.sets));
+      })
+      .catch(() => {});
   }, []);
 
   /** 목록 상태와 localStorage 를 함께 바꾼다 */
@@ -658,6 +678,20 @@ export default function WordLab() {
     setsRef.current = next;
     setSets(next);
     saveWordSets(next);
+  }
+
+  /** 단어장 하나를 공유 저장에 올린다 (같은 id 면 교체). 꺼져 있으면 조용히 넘어간다 */
+  async function syncSet(id) {
+    const set = findWordSet(setsRef.current, id);
+    if (!set) return;
+    try {
+      await pushRemoteSet(set);
+      commitSets(updateWordSet(setsRef.current, id, { synced: true }));
+      setSyncNote('');
+    } catch (e) {
+      // 꺼져 있는 건 고칠 게 없으니 조용히. 실패는 무엇이 됐고 안 됐는지 알린다
+      setSyncNote(e.disabled ? '' : e.message || '다른 기기에는 저장하지 못했어요. 이 기기에는 저장됐어요.');
+    }
   }
 
   function onExtracted(w, truncated) {
@@ -679,6 +713,8 @@ export default function WordLab() {
       setPhonicsError(e.message || '규칙을 만들지 못했어요. 다음 단계로 넘어가도 괜찮아요.');
     } finally {
       setPhonicsLoading(false);
+      // 규칙까지 붙은 단어장을 다른 기기와 나눈다 (시작 1회 + 규칙 다시 뽑기마다 1회)
+      syncSet(id);
     }
   }
 
@@ -707,6 +743,11 @@ export default function WordLab() {
     if (!set) return;
     if (!window.confirm('"' + wordSetTitle(set) + '" 단어장을 지울까요?')) return;
     commitSets(removeWordSet(setsRef.current, id));
+    if (set.synced) {
+      deleteRemoteSet(id).catch((e) => {
+        if (!e.disabled) setSyncNote(e.message || '다른 기기에서는 지우지 못했어요. 이 기기에서는 지워졌어요.');
+      });
+    }
   }
 
   function finishStage(results, mode) {
@@ -756,7 +797,9 @@ export default function WordLab() {
 
         {showSteps && <Steps current={shellStep} />}
 
-        {step === 'upload' && <Upload onExtracted={onExtracted} sets={sets} onResume={resume} onRemove={remove} />}
+        {step === 'upload' && (
+          <Upload onExtracted={onExtracted} sets={sets} syncNote={syncNote} onResume={resume} onRemove={remove} />
+        )}
 
         {step === 'check' && (
           <Review

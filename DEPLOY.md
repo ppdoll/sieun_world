@@ -53,6 +53,9 @@ npx vercel
 | `CLAUDE_EFFORT` | 아니오 | 기본 `medium`. `low` 면 더 빠르고 싸다 |
 | `APP_PASSCODE` | 아니오 | 넣으면 사진 추출 시 이 비밀번호를 요구한다 (§6) |
 | `SITE_URL` | 아니오 | 링크 미리보기(og:image)에 쓰는 절대 주소. 비우면 Vercel 이 주는 프로덕션 도메인을 쓴다. 커스텀 도메인을 붙였을 때만 `https://내도메인` 으로 지정 |
+| `GITHUB_TOKEN` | 아니오 | 넣으면 단어장 최근 5개를 이 저장소의 `data` 브랜치에 커밋해 다른 기기와 나눈다 (§9) |
+| `GITHUB_REPO` | 아니오 | 기본 `ppdoll/sieun_world` |
+| `GITHUB_DATA_BRANCH` | 아니오 | 기본 `data` |
 
 환경변수를 바꾼 뒤에는 다시 배포해야 반영된다.
 
@@ -81,6 +84,20 @@ npx vercel --prod
 - 요청 본문 한도는 4.5MB. 브라우저가 사진을 긴 변 1600px JPEG 로 줄여서 보내므로 보통 300~600KB 다
 - 사진 한 장당 모델 호출은 1회, 응답이 잘리면 최대 3회. 파닉스 규칙은 단어장당 1회
 - 하루 호출 상한은 아직 없다 (CHECKLIST B-5). 서버리스는 요청 간 상태를 공유하지 않아서 DB 나 KV 가 붙어야 걸 수 있다
+
+## 9. 기기 간 단어장 공유 (DB 없이, git 으로)
+
+단어장은 기본으로 브라우저 `localStorage` 에 최근 10개가 남는다. 아빠 폰에서 만든 것을 아이 태블릿에서도 보려면 `GITHUB_TOKEN` 을 넣는다. 그러면 서버 함수가 이 저장소의 `data` 브랜치에 `wordsets.json` 을 커밋한다(최근 5개). 앱을 열면 그 파일을 받아와 이 기기 목록과 합친다.
+
+1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token
+2. Repository access: **Only select repositories** → `sieun_world`
+3. Permissions → Repository permissions → **Contents: Read and write** (다른 권한은 불필요)
+4. 만료는 1년으로. 만료되면 앱은 "다른 기기에는 저장하지 못했어요" 를 띄우고 이 기기에는 계속 저장된다
+5. 토큰을 Vercel 환경변수 `GITHUB_TOKEN` 에 넣고 재배포
+
+`data` 브랜치는 처음 저장할 때 자동으로 만들어진다. `vercel.json` 의 `git.deploymentEnabled.data = false` 때문에 이 브랜치에 커밋이 쌓여도 배포는 일어나지 않는다.
+
+**저장소가 공개(public)면 단어장 텍스트도 공개다.** 교재 단어와 뜻, 날짜만 들어가지만, 아이 학습 기록이므로 저장소를 Private 으로 바꾸는 쪽을 권한다 (GitHub 저장소 → Settings → General → Danger Zone → Change visibility). Private 으로 바꿔도 Vercel 배포와 이 기능은 그대로 동작한다.
 
 ## 8. 사진은 저장되지 않는다
 

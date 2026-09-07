@@ -74,3 +74,30 @@ test('migrateLegacy: 목록이 이미 있으면 그대로, 예전 것이 비었�
   assert.deepEqual(migrateLegacy([], { words: [] }), []);
   assert.deepEqual(migrateLegacy(undefined, null), []);
 });
+
+test('mergeWordSets: 같은 id 는 공유 쪽을 믿고 synced 표시, 최근 순, 최대 개수', async () => {
+  const { mergeWordSets } = await import('./wordsets.mjs');
+  const a = setAt(1000);
+  const b = setAt(2000);
+  const c = setAt(3000);
+  const local = [b, a];
+  const remote = [{ ...a, phonics: [{ pattern: '-ture' }] }, c];
+  const merged = mergeWordSets(local, remote);
+  assert.deepEqual(merged.map((s) => s.at), [3000, 2000, 1000]);
+  assert.equal(merged[2].phonics.length, 1);
+  assert.equal(merged[2].synced, true);
+  assert.equal(merged[0].synced, true);
+  assert.equal(merged[1].synced, undefined);
+  assert.equal(mergeWordSets(local, remote, 2).length, 2);
+  assert.deepEqual(mergeWordSets(null, undefined), []);
+});
+
+test('toRemoteWordSet: 필요한 필드만 남기고 이상한 값은 null', async () => {
+  const { toRemoteWordSet } = await import('./wordsets.mjs');
+  const s = { ...setAt(1000), synced: true, junk: 1 };
+  const r = toRemoteWordSet(s);
+  assert.deepEqual(Object.keys(r).sort(), ['at', 'id', 'phonics', 'words']);
+  assert.equal(toRemoteWordSet({ id: 'x', words: [] }), null);
+  assert.equal(toRemoteWordSet({ words: [W('a')] }), null);
+  assert.equal(toRemoteWordSet(null), null);
+});

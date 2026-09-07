@@ -20,20 +20,21 @@ export function setPasscode(code) {
 }
 
 export class ApiError extends Error {
-  constructor(message, { status, needPasscode = false } = {}) {
+  constructor(message, { status, needPasscode = false, disabled = false } = {}) {
     super(message);
     this.status = status;
     this.needPasscode = needPasscode;
+    this.disabled = disabled; // 서버에 그 기능이 꺼져 있음 (예: GITHUB_TOKEN 없음)
   }
 }
 
-async function post(path, body) {
+async function request(method, path, body) {
   let res;
   try {
     res = await fetch(path, {
-      method: 'POST',
+      method,
       headers: { 'Content-Type': 'application/json', 'x-passcode': getPasscode() },
-      body: JSON.stringify(body),
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new ApiError('인터넷이 연결되어 있는지 확인하고 다시 눌러주세요.', { status: 0 });
@@ -48,10 +49,13 @@ async function post(path, body) {
     throw new ApiError(data?.error || '잘 되지 않았어요. 한 번 더 눌러주세요.', {
       status: res.status,
       needPasscode: !!data?.needPasscode,
+      disabled: !!data?.disabled,
     });
   }
   return data;
 }
+
+const post = (path, body) => request('POST', path, body);
 
 /**
  * 사진을 서버로 보내기 전에 줄인다.
@@ -107,4 +111,21 @@ export function extractFromImage(image) {
 /** 단어 목록 → { phonics, status } */
 export function extractPhonics(words) {
   return post('/api/extract/phonics', { words });
+}
+
+/* ── 공유 저장 (git data 브랜치, 최근 5개). 다른 기기와 단어장을 나눈다 ── */
+
+/** → { sets, disabled? } */
+export function fetchRemoteSets() {
+  return request('GET', '/api/wordsets');
+}
+
+/** 단어장 올리기(같은 id 면 교체) → { sets } */
+export function pushRemoteSet(set) {
+  return post('/api/wordsets', { set });
+}
+
+/** 단어장 지우기 → { sets } */
+export function deleteRemoteSet(id) {
+  return request('DELETE', '/api/wordsets?id=' + encodeURIComponent(id));
 }

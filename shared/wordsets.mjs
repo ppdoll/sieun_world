@@ -2,7 +2,8 @@
 // 저장된 단어장 목록을 다루는 순수 함수. 최근 것이 앞에 오고 최대 MAX_WORDSETS 개만 남긴다.
 // localStorage 읽기/쓰기는 src/storage.js 가 맡는다.
 
-export const MAX_WORDSETS = 10;
+export const MAX_WORDSETS = 10; // 이 기기(localStorage)
+export const MAX_REMOTE_WORDSETS = 5; // 공유 저장(git data 브랜치). 다른 기기에서 받아간다
 
 /** 새 단어장 객체. id 는 시각 + 난수. */
 export function makeWordSet(words, phonics = [], at = Date.now(), rand = Math.random()) {
@@ -43,6 +44,34 @@ export function wordSetTitle(set) {
   if (words.length === 0) return date;
   const first = words[0].word;
   return words.length === 1 ? date + ' · ' + first : date + ' · ' + first + ' 외 ' + (words.length - 1) + '개';
+}
+
+/**
+ * 이 기기 목록과 공유 저장 목록을 합친다.
+ * - 같은 id 는 공유 저장 쪽을 믿는다 (다른 기기에서 규칙을 다시 뽑았을 수 있다)
+ * - 공유에서 온 것은 synced: true 로 표시한다
+ * - 최근 것이 앞, 최대 max 개
+ */
+export function mergeWordSets(local, remote, max = MAX_WORDSETS) {
+  const byId = new Map();
+  for (const s of Array.isArray(local) ? local : []) if (s && s.id) byId.set(s.id, s);
+  for (const s of Array.isArray(remote) ? remote : []) if (s && s.id) byId.set(s.id, { ...s, synced: true });
+  return [...byId.values()].sort((a, b) => (b.at ?? 0) - (a.at ?? 0)).slice(0, max);
+}
+
+/**
+ * 공유 저장에 넣기 전 정리. 화면 전용 표시(synced)와 모르는 필드는 버린다.
+ * words/phonics 가 배열이 아니거나 id 가 없으면 null.
+ */
+export function toRemoteWordSet(set) {
+  if (!set || typeof set.id !== 'string' || !set.id) return null;
+  if (!Array.isArray(set.words) || set.words.length === 0) return null;
+  return {
+    id: set.id,
+    at: Number(set.at) || Date.now(),
+    words: set.words.slice(0, 100),
+    phonics: Array.isArray(set.phonics) ? set.phonics.slice(0, 5) : [],
+  };
 }
 
 /**
