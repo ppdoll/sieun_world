@@ -52,6 +52,7 @@ npx vercel
 | `CLAUDE_MODEL` | 아니오 | 기본 `claude-opus-5`. 비용을 낮추려면 `claude-sonnet-5` |
 | `CLAUDE_EFFORT` | 아니오 | 기본 `medium`. `low` 면 더 빠르고 싸다 |
 | `APP_PASSCODE` | 아니오 | 넣으면 사진 추출 시 이 비밀번호를 요구한다 (§6) |
+| `SITE_URL` | 아니오 | 링크 미리보기(og:image)에 쓰는 절대 주소. 비우면 Vercel 이 주는 프로덕션 도메인을 쓴다. 커스텀 도메인을 붙였을 때만 `https://내도메인` 으로 지정 |
 
 환경변수를 바꾼 뒤에는 다시 배포해야 반영된다.
 

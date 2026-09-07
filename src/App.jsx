@@ -3,24 +3,16 @@ import { buildQuiz, gradeAnswer, summarize, collectWrong, sanitizeWords } from '
 import { flagWords, normalizeLetters, highlightChunks, sanitizePhonics } from '../shared/extract-logic.mjs';
 import { speak, initSpeech, hasEnglishVoice } from './speech.js';
 import { prepareImage, extractFromImage, extractPhonics, getPasscode, setPasscode } from './api.js';
-
-const SAVE_KEY = 'wordlab:current';
-
-function loadSaved() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-function persist(words, phonics) {
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ words, phonics, at: Date.now() }));
-  } catch {
-    /* 저장 실패해도 학습은 계속 */
-  }
-}
+import { loadWordSets, saveWordSets } from './storage.js';
+import {
+  MAX_WORDSETS,
+  makeWordSet,
+  addWordSet,
+  removeWordSet,
+  updateWordSet,
+  findWordSet,
+  wordSetTitle,
+} from '../shared/wordsets.mjs';
 
 /* ────────────────────────────────────────────────────────────
    공용 조각
@@ -81,7 +73,7 @@ function Steps({ current }) {
    1. 사진 올리기
    ──────────────────────────────────────────────────────────── */
 
-function Upload({ onExtracted, saved, onResume }) {
+function Upload({ onExtracted, sets, onResume, onRemove }) {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -181,10 +173,23 @@ function Upload({ onExtracted, saved, onResume }) {
         </div>
       )}
 
-      {saved?.words?.length > 0 && !busy && (
-        <button className="wl-ghost" onClick={onResume}>
-          지난번 단어장 이어서 하기 ({saved.words.length}개)
-        </button>
+      {sets.length > 0 && !busy && (
+        <div className="wl-sets">
+          <div className="wl-sets-h">
+            지난 단어장 <span className="wl-sets-n">{sets.length} / {MAX_WORDSETS}</span>
+          </div>
+          {sets.map((s) => (
+            <div className="wl-set" key={s.id}>
+              <button className="wl-set-main" onClick={() => onResume(s.id)}>
+                <span className="wl-set-t">{wordSetTitle(s)}</span>
+                <span className="wl-set-s">{s.words.length}개 단어 · 이어서 하기</span>
+              </button>
+              <button className="wl-x" onClick={() => onRemove(s.id)} aria-label="이 단어장 지우기">
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -638,13 +643,22 @@ export default function WordLab() {
   const [wrongWords, setWrongWords] = useState([]);
   const [summary, setSummary] = useState(null);
   const [stage, setStage] = useState('quiz');
-  const [saved, setSaved] = useState(null);
+  const [sets, setSets] = useState([]);
+  const setsRef = useRef([]); // 비동기 콜백(규칙 도착)에서 최신 목록을 보기 위한 거울
+  const [currentId, setCurrentId] = useState(null);
   const [seedBump, setSeedBump] = useState(0);
 
   useEffect(() => {
-    setSaved(loadSaved());
+    commitSets(loadWordSets());
     initSpeech();
   }, []);
+
+  /** 목록 상태와 localStorage 를 함께 바꾼다 */
+  function commitSets(next) {
+    setsRef.current = next;
+    setSets(next);
+    saveWordSets(next);
+  }
 
   function onExtracted(w, truncated) {
     setPending({ words: w, truncated });
@@ -652,13 +666,14 @@ export default function WordLab() {
   }
 
   /** 단어 목록만 보내 규칙을 (다시) 만든다. 사진은 다시 읽지 않는다 */
-  async function loadPhonics(w) {
+  async function loadPhonics(w, id) {
     setPhonicsLoading(true);
     setPhonicsError('');
     try {
       const got = await extractPhonics(w);
-      setPhonics(got.phonics || []);
-      persist(w, got.phonics || []);
+      const rules = got.phonics || [];
+      setPhonics(rules);
+      commitSets(updateWordSet(setsRef.current, id, { phonics: rules }));
     } catch (e) {
       // 규칙이 없어도 학습은 계속. 무엇이 잘못됐는지는 화면에 남긴다
       setPhonicsError(e.message || '규칙을 만들지 못했어요. 다음 단계로 넘어가도 괜찮아요.');
@@ -667,19 +682,31 @@ export default function WordLab() {
     }
   }
 
+  /** 검수를 마친 단어장으로 시작. 목록 맨 앞에 저장되고 오래된 것은 밀려난다 */
   function start(w) {
+    const set = makeWordSet(w, []);
+    commitSets(addWordSet(setsRef.current, set));
+    setCurrentId(set.id);
     setWords(w);
     setPhonics([]);
-    persist(w, []);
     setStep('phonics');
-    loadPhonics(w);
+    loadPhonics(w, set.id);
   }
 
-  function resume() {
-    if (!saved) return;
-    setWords(saved.words);
-    setPhonics(saved.phonics || []);
+  function resume(id) {
+    const set = findWordSet(setsRef.current, id);
+    if (!set) return;
+    setCurrentId(id);
+    setWords(set.words);
+    setPhonics(set.phonics || []);
     setStep('phonics');
+  }
+
+  function remove(id) {
+    const set = findWordSet(setsRef.current, id);
+    if (!set) return;
+    if (!window.confirm('"' + wordSetTitle(set) + '" 단어장을 지울까요?')) return;
+    commitSets(removeWordSet(setsRef.current, id));
   }
 
   function finishStage(results, mode) {
@@ -709,7 +736,7 @@ export default function WordLab() {
     setPhonics([]);
     setWrongWords([]);
     setSummary(null);
-    setSaved(loadSaved());
+    setCurrentId(null);
   }
 
   const shellStep = step === 'result' ? (stage === 'final' ? 'final' : stage) : step;
@@ -729,7 +756,7 @@ export default function WordLab() {
 
         {showSteps && <Steps current={shellStep} />}
 
-        {step === 'upload' && <Upload onExtracted={onExtracted} saved={saved} onResume={resume} />}
+        {step === 'upload' && <Upload onExtracted={onExtracted} sets={sets} onResume={resume} onRemove={remove} />}
 
         {step === 'check' && (
           <Review
@@ -747,7 +774,7 @@ export default function WordLab() {
             error={phonicsError}
             words={words}
             onNext={() => setStep('chunks')}
-            onRefresh={() => loadPhonics(words)}
+            onRefresh={() => loadPhonics(words, currentId)}
           />
         )}
 

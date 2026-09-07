@@ -1,0 +1,14 @@
+{
+  "name": "시은이 영어 단어 연습",
+  "short_name": "단어 연습",
+  "description": "단어장 사진을 올리면 덩어리 읽기부터 시험, 오답 복습까지 이어져요.",
+  "lang": "ko",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EDF3F8",
+  "theme_color": "#3D8BD3",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -135,6 +135,18 @@ body{background:#EDF3F8}
 .wl-x{background:none;border:none;color:var(--ink2);font-size:20px;line-height:1;padding:8px 6px;cursor:pointer;font-family:inherit}
 .wl-x:hover{color:var(--no)}
 
+/* ── 지난 단어장 목록 ── */
+.wl-sets{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.wl-sets-h{font-size:13px;font-weight:700;color:var(--ink2);padding:4px 4px 2px;display:flex;justify-content:space-between}
+.wl-sets-n{font-weight:600}
+.wl-set{display:flex;align-items:stretch;background:var(--card);border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
+.wl-set-main{flex:1;background:none;border:none;text-align:left;padding:12px 14px;cursor:pointer;font-family:inherit;color:var(--ink);
+  display:flex;flex-direction:column;gap:3px}
+.wl-set-main:hover{background:#F3F8FC}
+.wl-set-t{font-size:15px;font-weight:800}
+.wl-set-s{font-size:12.5px;color:var(--ink2)}
+.wl-set .wl-x{padding:0 14px;border-left:1.5px solid var(--line)}
+
 /* ── 비밀번호 ── */
 .wl-passbox{background:var(--card);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
 .wl-passlabel{font-size:13.5px;color:var(--ink2);font-weight:700}
