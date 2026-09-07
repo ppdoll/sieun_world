@@ -1,0 +1,316 @@
+{
+  "sets": [
+    {
+      "id": "1788748928589-a5zu",
+      "at": 1788748928589,
+      "words": [
+        {
+          "word": "creature",
+          "meaning": "생명체",
+          "chunks": [
+            "crea",
+            "ture"
+          ]
+        },
+        {
+          "word": "mantis shrimp",
+          "meaning": "갯가재",
+          "chunks": [
+            "man",
+            "tis",
+            "shrimp"
+          ]
+        },
+        {
+          "word": "brightly",
+          "meaning": "밝게, 선명하게",
+          "chunks": [
+            "bright",
+            "ly"
+          ]
+        },
+        {
+          "word": "recognize",
+          "meaning": "인식하다, 알아보다",
+          "chunks": [
+            "rec",
+            "og",
+            "nize"
+          ]
+        },
+        {
+          "word": "vision",
+          "meaning": "시력, 눈; 시야",
+          "chunks": [
+            "vi",
+            "sion"
+          ]
+        },
+        {
+          "word": "mate",
+          "meaning": "친구, 짝",
+          "chunks": [
+            "mate"
+          ]
+        },
+        {
+          "word": "hunter",
+          "meaning": "사냥꾼",
+          "chunks": [
+            "hun",
+            "ter"
+          ]
+        },
+        {
+          "word": "strength",
+          "meaning": "힘, 기운",
+          "chunks": [
+            "strength"
+          ]
+        },
+        {
+          "word": "club",
+          "meaning": "무거운 막대기",
+          "chunks": [
+            "club"
+          ]
+        },
+        {
+          "word": "fascinating",
+          "meaning": "대단히 흥미로운, 매력적인",
+          "chunks": [
+            "fas",
+            "ci",
+            "na",
+            "ting"
+          ]
+        },
+        {
+          "word": "invent",
+          "meaning": "발명하다",
+          "chunks": [
+            "in",
+            "vent"
+          ]
+        },
+        {
+          "word": "material",
+          "meaning": "재료, 직물, 천",
+          "chunks": [
+            "ma",
+            "te",
+            "ri",
+            "al"
+          ]
+        },
+        {
+          "word": "vehicle",
+          "meaning": "차량, 탈것, 운송 수단",
+          "chunks": [
+            "ve",
+            "hi",
+            "cle"
+          ]
+        },
+        {
+          "word": "amazing",
+          "meaning": "놀라운",
+          "chunks": [
+            "a",
+            "maz",
+            "ing"
+          ]
+        },
+        {
+          "word": "exist",
+          "meaning": "존재하다",
+          "chunks": [
+            "ex",
+            "ist"
+          ]
+        },
+        {
+          "word": "ocean",
+          "meaning": "대양, 바다",
+          "chunks": [
+            "o",
+            "cean"
+          ]
+        },
+        {
+          "word": "coral reef",
+          "meaning": "산호초",
+          "chunks": [
+            "cor",
+            "al",
+            "reef"
+          ]
+        },
+        {
+          "word": "group",
+          "meaning": "무리, 집단, 그룹",
+          "chunks": [
+            "group"
+          ]
+        },
+        {
+          "word": "shell",
+          "meaning": "껍데기, 껍질",
+          "chunks": [
+            "shell"
+          ]
+        },
+        {
+          "word": "bullet",
+          "meaning": "총알",
+          "chunks": [
+            "bul",
+            "let"
+          ]
+        },
+        {
+          "word": "indoor",
+          "meaning": "실내의",
+          "chunks": [
+            "in",
+            "door"
+          ]
+        },
+        {
+          "word": "make up",
+          "meaning": "화장하다",
+          "chunks": [
+            "make",
+            "up"
+          ]
+        },
+        {
+          "word": "swallow",
+          "meaning": "삼키다",
+          "chunks": [
+            "swal",
+            "low"
+          ]
+        },
+        {
+          "word": "assign",
+          "meaning": "배정하다, 할당하다",
+          "chunks": [
+            "as",
+            "sign"
+          ]
+        },
+        {
+          "word": "wound",
+          "meaning": "상처, 부상",
+          "chunks": [
+            "wound"
+          ]
+        },
+        {
+          "word": "ship",
+          "meaning": "(큰) 배, 선박, 함선",
+          "chunks": [
+            "ship"
+          ]
+        },
+        {
+          "word": "scissors",
+          "meaning": "가위",
+          "chunks": [
+            "scis",
+            "sors"
+          ]
+        },
+        {
+          "word": "rapid",
+          "meaning": "급격한, 빠른",
+          "chunks": [
+            "ra",
+            "pid"
+          ]
+        },
+        {
+          "word": "forward",
+          "meaning": "앞으로",
+          "chunks": [
+            "for",
+            "ward"
+          ]
+        },
+        {
+          "word": "insert",
+          "meaning": "넣다, 삽입하다",
+          "chunks": [
+            "in",
+            "sert"
+          ]
+        }
+      ],
+      "phonics": [
+        {
+          "pattern": "sh",
+          "letters": [
+            "sh"
+          ],
+          "sound": "쉬",
+          "tip": "s와 h가 만나면 조용히 하라는 '쉬~' 소리가 나요.",
+          "words": [
+            "mantis shrimp",
+            "ship",
+            "shell"
+          ]
+        },
+        {
+          "pattern": "-ll",
+          "letters": [
+            "ll"
+          ],
+          "sound": "ㄹ",
+          "tip": "l이 두 개 붙어도 소리는 하나, 혀를 윗니 뒤에 대고 'ㄹ' 소리를 내요.",
+          "words": [
+            "shell",
+            "bullet",
+            "swallow"
+          ]
+        },
+        {
+          "pattern": "-ing",
+          "letters": [
+            "ing"
+          ],
+          "sound": "잉",
+          "tip": "단어 끝의 -ing는 코로 소리를 내며 '잉'이라고 읽어요.",
+          "words": [
+            "fascinating",
+            "amazing"
+          ]
+        },
+        {
+          "pattern": "ou",
+          "letters": [
+            "ou"
+          ],
+          "sound": "우",
+          "tip": "ou가 '우'로 길게 소리 나는 단어도 있어요.",
+          "words": [
+            "group",
+            "wound"
+          ]
+        },
+        {
+          "pattern": "-ss",
+          "letters": [
+            "ss"
+          ],
+          "sound": "스",
+          "tip": "s가 두 개여도 뱀처럼 '스' 소리 하나만 내요.",
+          "words": [
+            "scissors",
+            "assign"
+          ]
+        }
+      ]
+    }
+  ]
+}
