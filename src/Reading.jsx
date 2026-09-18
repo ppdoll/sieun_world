@@ -8,6 +8,7 @@ import {
   mergeQuestions,
   buildWordIndex,
   splitSentenceByWords,
+  toTranslationMap,
 } from '../shared/passage-logic.mjs';
 import {
   buildEvidenceQuiz,
@@ -380,7 +381,7 @@ function Read({ sentences, translations, transLoading, wordIndex, onNext }) {
    4. 근거 문장 찾기 — 질문의 답이 어느 문장에 있는지 고른다
    ──────────────────────────────────────────────────────────── */
 
-function Evidence({ sentences, questions, translations, wordIndex, seed, onNext }) {
+function Evidence({ sentences, questions, translations, questionKo, wordIndex, seed, onNext }) {
   const [items] = useState(() => buildEvidenceQuiz(sentences, questions, { seed }));
   const [i, setI] = useState(0);
   const [judged, setJudged] = useState(null);
@@ -425,7 +426,8 @@ function Evidence({ sentences, questions, translations, wordIndex, seed, onNext 
       <p className="wl-sub">이 질문의 답이 어느 문장에 있을까요. 문장을 골라주세요.</p>
 
       <div className="wl-stage wl-stage-left">
-        <div className="wl-qtext wl-qtext-big">{item.question}</div>
+        <Sentence sentence={item.question} wordIndex={wordIndex} className="wl-qtext wl-qtext-big" />
+        <Translation ko={questionKo?.[item.question]} />
         <div className="wl-options">
           {item.sentences.map((s, k) => (
             <button
@@ -472,7 +474,7 @@ function Evidence({ sentences, questions, translations, wordIndex, seed, onNext 
    5. 모의 시험 — 실제 시험과 같은 여섯 유형
    ──────────────────────────────────────────────────────────── */
 
-function Quiz({ questions, seed, title, subtitle, sentences, translations, wordIndex, onDone }) {
+function Quiz({ questions, seed, title, subtitle, sentences, translations, questionKo, wordIndex, onDone }) {
   const [quiz] = useState(() => buildReadingQuiz(questions, { seed }));
   const [i, setI] = useState(0);
   const [judged, setJudged] = useState(null);
@@ -530,6 +532,12 @@ function Quiz({ questions, seed, title, subtitle, sentences, translations, wordI
         {judged && (
           <div className={'wl-verdict ' + (judged.correct ? 'ok' : 'no')}>
             <div className="wl-verdict-t">{judged.correct ? '맞았어요' : '정답을 볼까요'}</div>
+            {questionKo?.[item.question] && (
+              <div className="wl-qko">
+                <span className="wl-qko-l">물어본 것</span>
+                {questionKo[item.question]}
+              </div>
+            )}
             {item.evidence ? (
               <>
                 <p className="wl-note">지문에서 답이 있는 곳이에요.</p>
@@ -614,6 +622,7 @@ export default function Reading({ onHome }) {
   const [sentences, setSentences] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [translations, setTranslations] = useState([]);
+  const [questionKo, setQuestionKo] = useState({}); // 질문 원문 → 한국어
   const [transLoading, setTransLoading] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState([]); // 지금 푸는 문제 (오답만 남을 수 있다)
   const [summary, setSummary] = useState(null);
@@ -648,6 +657,9 @@ export default function Reading({ onHome }) {
       if (id) commitSets(updateWordSet(setsRef.current, id, { questions: merged }));
       if ((got.questions || []).length === 0) {
         setGenError('새 문제를 만들지 못했어요. 지금 있는 문제로 연습해도 괜찮아요.');
+      } else {
+        // 새로 생긴 질문에도 뜻을 붙인다
+        loadTranslations(splitSentences(text), merged, id);
       }
     } catch (e) {
       setGenError(e.message || '새 문제를 만들지 못했어요. 지금 있는 문제로 연습해도 괜찮아요.');
@@ -656,16 +668,24 @@ export default function Reading({ onHome }) {
     }
   }
 
-  /** 문장 번역을 받아 둔다. 실패해도 읽기는 그대로 된다 */
-  async function loadTranslations(list, id) {
-    if (!list?.length) return;
+  /**
+   * 지문 문장과 시험 질문을 한 번에 번역해 둔다 (호출 한 번).
+   * 실패해도 읽기와 시험은 그대로 된다.
+   */
+  async function loadTranslations(list, qs, id) {
+    const texts = [...new Set([...(list ?? []), ...(qs ?? []).map((q) => q.question)])].filter(Boolean);
+    if (texts.length === 0) return;
     setTransLoading(true);
     try {
-      const got = await translateSentences(list);
-      const ko = got.translations || [];
+      const got = await translateSentences(texts);
+      const map = toTranslationMap(texts, got.translations || []);
+      const ko = (list ?? []).map((sen) => map[sen] ?? '');
+      const qko = {};
+      for (const q of qs ?? []) if (map[q.question]) qko[q.question] = map[q.question];
       setTranslations(ko);
-      setPending((p) => ({ ...p, translations: ko }));
-      if (id) commitSets(updateWordSet(setsRef.current, id, { translations: ko }));
+      setQuestionKo(qko);
+      setPending((p) => ({ ...p, translations: ko, questionKo: qko }));
+      if (id) commitSets(updateWordSet(setsRef.current, id, { translations: ko, questionKo: qko }));
     } catch {
       // 번역이 없어도 문장 읽기와 시험은 그대로 된다
     } finally {
@@ -676,15 +696,20 @@ export default function Reading({ onHome }) {
   function onExtracted(got) {
     setPending(got);
     setTranslations([]);
+    setQuestionKo({});
     setStep('check');
     // 검수 화면을 보는 동안 모의 문제와 번역을 만들어 둔다
     loadQuestions(got.passage, got.questions, null);
-    loadTranslations(got.sentences, null);
+    loadTranslations(got.sentences, got.questions, null);
   }
 
   /** 검수를 마친 지문으로 시작 */
   function start(checked) {
-    const set = { ...makePassageSet(checked), translations: checked.translations ?? translations ?? [] };
+    const set = {
+      ...makePassageSet(checked),
+      translations: checked.translations ?? translations ?? [],
+      questionKo: checked.questionKo ?? questionKo ?? {},
+    };
     commitSets(addWordSet(setsRef.current, set, MAX_PASSAGE_SETS));
     setCurrentId(set.id);
     setPassage(checked.passage);
@@ -694,7 +719,7 @@ export default function Reading({ onHome }) {
     setSummary(null);
     setStep('read');
     // 검수에서 지문을 고쳤으면 문장이 달라져 번역 자리가 어긋난다. 다시 받는다
-    if (set.translations.length !== checked.sentences.length) loadTranslations(checked.sentences, set.id);
+    if (set.translations.length !== checked.sentences.length) loadTranslations(checked.sentences, checked.questions, set.id);
   }
 
   function resume(id) {
@@ -706,11 +731,12 @@ export default function Reading({ onHome }) {
     setSentences(set.sentences);
     setQuestions(set.questions);
     setTranslations(set.translations || []);
+    setQuestionKo(set.questionKo || {});
     setWrong([]);
     setSummary(null);
     setStep('read');
     // 이 기능이 생기기 전에 저장된 지문에는 번역이 없다
-    if ((set.translations || []).length !== set.sentences.length) loadTranslations(set.sentences, id);
+    if ((set.translations || []).length !== set.sentences.length) loadTranslations(set.sentences, set.questions, id);
   }
 
   function remove(id) {
@@ -741,6 +767,7 @@ export default function Reading({ onHome }) {
     setSentences([]);
     setQuestions([]);
     setTranslations([]);
+    setQuestionKo({});
     setQuizQuestions([]);
     setSummary(null);
     setWrong([]);
@@ -801,6 +828,7 @@ export default function Reading({ onHome }) {
             sentences={sentences}
             questions={questions}
             translations={translations}
+            questionKo={questionKo}
             wordIndex={wordIndex}
             seed={13 + seedBump}
             onNext={() => startQuiz(questions, 'quiz')}
@@ -815,6 +843,7 @@ export default function Reading({ onHome }) {
               questions={quizQuestions}
               sentences={sentences}
               translations={translations}
+              questionKo={questionKo}
               wordIndex={wordIndex}
               seed={(mode === 'review' ? 41 : 17) + seedBump}
               title={mode === 'review' ? '오답 다시 풀기' : '모의 시험'}

@@ -358,3 +358,16 @@ test('translatePrompt: 문장에 번호를 붙이고 글자 그대로 옮기라�
   assert.match(p, /글자 그대로/);
   assert.match(p, /초등 4학년/);
 });
+
+test('findSentence: 통째로 같으면 짧아도 찾는다 (짧은 질문에 번역을 붙이려고)', () => {
+  assert.equal(findSentence(['How fast?', 'What is it?'], 'How fast?'), 0);
+  assert.equal(findSentence(['How fast?', 'What is it?'], 'how fast'), 0);
+  assert.equal(findSentence(SENTENCES, 'colors'), -1, '일부만 인용한 짧은 글은 여전히 안 받는다');
+});
+
+test('toTranslationMap: 원문을 열쇠로 번역을 붙이고 빈 자리는 넣지 않는다', async () => {
+  const { toTranslationMap } = await import('./passage-logic.mjs');
+  const map = toTranslationMap(['A?', 'B?', 'C?'], ['가', '', '다']);
+  assert.deepEqual(map, { 'A?': '가', 'C?': '다' });
+  assert.deepEqual(toTranslationMap(null, null), {});
+});

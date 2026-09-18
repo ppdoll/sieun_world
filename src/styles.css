@@ -252,3 +252,8 @@ body{background:#EDF3F8}
 .wl-answerbox{width:100%;background:#F7FBFE;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;
   gap:8px;text-align:left}
 .wl-sentence-sm{font-size:17px;line-height:1.8}
+
+/* ── 시험: 답한 뒤 보여주는 질문 뜻 ── */
+.wl-qko{width:100%;background:#FFF7D6;border-radius:10px;padding:10px 12px;font-size:14.5px;line-height:1.7;
+  color:#6B5300;text-align:left;word-break:keep-all}
+.wl-qko-l{display:block;font-size:11.5px;font-weight:800;opacity:.75;margin-bottom:2px}

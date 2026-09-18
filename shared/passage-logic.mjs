@@ -169,11 +169,14 @@ export const MIN_EVIDENCE_CHARS = 12;
  */
 export function findSentence(sentences, evidence) {
   const needle = normalizeForMatch(evidence);
-  if (needle.length < MIN_EVIDENCE_CHARS) return -1;
+  if (!needle) return -1;
   const list = Array.isArray(sentences) ? sentences : [];
   const norm = list.map(normalizeForMatch);
+  // 통째로 같으면 짧아도 받는다 ("How fast?" 같은 짧은 질문도 번역을 붙일 수 있게)
   const exact = norm.indexOf(needle);
   if (exact !== -1) return exact;
+  // 일부만 인용한 경우는 짧으면 우연히 맞을 수 있어 받지 않는다
+  if (needle.length < MIN_EVIDENCE_CHARS) return -1;
   return norm.findIndex((s) => s.includes(needle));
 }
 
@@ -425,7 +428,7 @@ export function translatePrompt(sentences) {
   const list = (Array.isArray(sentences) ? sentences : []).map((s, i) => i + 1 + '. ' + s).join('\n');
   return (
     '문장:\n' + list + '\n\n' +
-    '각 문장을 초등 4학년이 이해할 한국어로 옮겨줘.\n' +
+    '각 줄을 초등 4학년이 이해할 한국어로 옮겨줘. 지문 문장일 수도 있고 시험 질문일 수도 있다.\n' +
     'en: 받은 영어 문장을 글자 그대로 옮겨 적기 (번호는 빼고)\n' +
     'ko: 한국어 번역. 문장 구조가 보이게 자연스럽게. 너무 의역하지 말고 한 문장으로.\n' +
     '받은 문장 수만큼 빠짐없이 만들어줘.\n' +
@@ -471,4 +474,18 @@ export function missingTranslations(translations, sentences) {
   let miss = 0;
   for (let i = 0; i < n; i++) if (!list[i]) miss++;
   return miss;
+}
+
+/**
+ * 원문 목록과 번역 목록 → { 원문: 번역 }. 번역이 없는 자리는 넣지 않는다.
+ * 문장과 질문을 한 번에 번역해 받은 뒤 각자 제자리로 돌려놓을 때 쓴다.
+ */
+export function toTranslationMap(texts, translations) {
+  const list = Array.isArray(texts) ? texts : [];
+  const ko = Array.isArray(translations) ? translations : [];
+  const out = {};
+  list.forEach((t, i) => {
+    if (t && ko[i]) out[t] = ko[i];
+  });
+  return out;
 }
