@@ -124,3 +124,46 @@ test('generateQuestions: 거절이면 즉시 중단하고, sentences 를 안 줘
   const ok = await generateQuestions({ passage: PASSAGE, callModel: m.callModel });
   assert.equal(ok.questions.length, MIN_QUESTIONS, 'sentences 가 없으면 지문을 직접 나눠 검증한다');
 });
+
+/* ── 문장 번역 ─────────────────────────────────────────────────── */
+
+test('translateSentences: 한 번에 다 받으면 호출 한 번', async () => {
+  const { translateSentences } = await import('./passage-service.mjs');
+  const { callModel, prompts } = fakeModel([
+    reply({ translations: SENTENCES.map((en, i) => ({ en, ko: '번역' + i })) }),
+  ]);
+  const r = await translateSentences({ sentences: SENTENCES, callModel });
+  assert.equal(r.calls, 1);
+  assert.equal(r.status, 'ok');
+  assert.deepEqual(r.translations, SENTENCES.map((_, i) => '번역' + i));
+  assert.match(prompts[0], /1\. One of the most/);
+});
+
+test('translateSentences: 빠진 문장만 다시 묻는다', async () => {
+  const { translateSentences } = await import('./passage-service.mjs');
+  const { callModel, prompts } = fakeModel([
+    reply({ translations: [{ en: SENTENCES[0], ko: '첫째' }, { en: SENTENCES[2], ko: '셋째' }] }),
+    reply({ translations: [{ en: SENTENCES[1], ko: '둘째' }, { en: SENTENCES[3], ko: '넷째' }, { en: SENTENCES[4], ko: '다섯째' }] }),
+  ]);
+  const r = await translateSentences({ sentences: SENTENCES, callModel });
+  assert.equal(r.calls, 2);
+  assert.deepEqual(r.translations, ['첫째', '둘째', '셋째', '넷째', '다섯째']);
+  assert.doesNotMatch(prompts[1], /One of the most/, '이미 받은 문장은 다시 안 보낸다');
+  assert.match(prompts[1], /15 to 30cm/);
+});
+
+test('translateSentences: 두 번 다 실패해도 문장 수만큼 빈 배열, 거절은 즉시 중단', async () => {
+  const { translateSentences } = await import('./passage-service.mjs');
+  let m = fakeModel([reply({ translations: [] }), reply({ translations: [] })]);
+  const weak = await translateSentences({ sentences: SENTENCES, callModel: m.callModel });
+  assert.equal(weak.calls, 2);
+  assert.deepEqual(weak.translations, SENTENCES.map(() => ''));
+
+  m = fakeModel([{ content: [], stop_reason: 'refusal' }]);
+  const refused = await translateSentences({ sentences: SENTENCES, callModel: m.callModel });
+  assert.equal(refused.status, 'refused');
+  assert.equal(refused.calls, 1);
+
+  const none = await translateSentences({ sentences: [], callModel: fakeModel([]).callModel });
+  assert.equal(none.calls, 0);
+});

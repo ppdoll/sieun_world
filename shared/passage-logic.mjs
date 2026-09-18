@@ -396,3 +396,79 @@ export function splitSentenceByWords(sentence, wordIndex) {
   if (last < text.length) out.push({ text: text.slice(last) });
   return out;
 }
+
+/* ── 문장 번역 ─────────────────────────────────────────────────── */
+
+export const MAX_TRANSLATE_SENTENCES = 40;
+
+export const TRANSLATE_SCHEMA = {
+  type: 'object',
+  properties: {
+    translations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { en: { type: 'string' }, ko: { type: 'string' } },
+        required: ['en', 'ko'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['translations'],
+  additionalProperties: false,
+};
+
+export const TRANSLATE_SYSTEM =
+  'You translate English sentences into Korean for a Korean 4th grader. Return JSON only.';
+
+export function translatePrompt(sentences) {
+  const list = (Array.isArray(sentences) ? sentences : []).map((s, i) => i + 1 + '. ' + s).join('\n');
+  return (
+    '문장:\n' + list + '\n\n' +
+    '각 문장을 초등 4학년이 이해할 한국어로 옮겨줘.\n' +
+    'en: 받은 영어 문장을 글자 그대로 옮겨 적기 (번호는 빼고)\n' +
+    'ko: 한국어 번역. 문장 구조가 보이게 자연스럽게. 너무 의역하지 말고 한 문장으로.\n' +
+    '받은 문장 수만큼 빠짐없이 만들어줘.\n' +
+    'JSON만 출력.'
+  );
+}
+
+/**
+ * 번역을 지문 문장 순서에 맞춰 늘어놓는다. 못 맞춘 자리는 빈 문자열.
+ * 번역이 맞는지는 기계로 확인할 수 없지만, "어느 문장의 번역인가" 는 근거 문장과 같은 방식으로
+ * 대조한다. 엉뚱한 문장에 번역이 달리는 것만은 막는다.
+ */
+export function sanitizeTranslations(raw, sentences) {
+  const list = Array.isArray(sentences) ? sentences : [];
+  const out = list.map(() => '');
+  if (!Array.isArray(raw)) return out;
+  for (const item of raw) {
+    const ko = String(item?.ko ?? '').replace(/\s+/g, ' ').trim();
+    if (!ko) continue;
+    const at = findSentence(list, item?.en);
+    if (at === -1 || out[at]) continue;
+    out[at] = ko.slice(0, 300);
+  }
+  return out;
+}
+
+/** 번역 응답 해석. 실패해도 문장 수만큼의 빈 배열을 돌려준다 */
+export function parseTranslateResponse(message, sentences) {
+  const empty = (Array.isArray(sentences) ? sentences : []).map(() => '');
+  if (!message || message.stop_reason === 'refusal') return { status: 'refused', translations: empty };
+  const parsed = extractJson(messageText(message));
+  if (!parsed) {
+    return { status: message.stop_reason === 'max_tokens' ? 'truncated' : 'unparsable', translations: empty };
+  }
+  const translations = sanitizeTranslations(parsed.translations, sentences);
+  return { status: message.stop_reason === 'max_tokens' ? 'truncated' : 'ok', translations };
+}
+
+/** 번역이 하나라도 빠진 자리가 있는가 */
+export function missingTranslations(translations, sentences) {
+  const n = (Array.isArray(sentences) ? sentences : []).length;
+  const list = Array.isArray(translations) ? translations : [];
+  let miss = 0;
+  for (let i = 0; i < n; i++) if (!list[i]) miss++;
+  return miss;
+}

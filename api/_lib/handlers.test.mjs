@@ -343,3 +343,42 @@ test('questions: 지문이 비면 400, 너무 길면 413', async () => {
   await handler(mockReq({ body: { passage: 'x '.repeat(9000) } }), res);
   assert.equal(res.statusCode, 413);
 });
+
+test('translate: 문장 수만큼 번역을 돌려주고, 문장이 없으면 400', async () => {
+  const { makeTranslateHandler } = await import('./handlers.mjs');
+  const S = ['One of the most interesting creatures is the mantis shrimp.', 'They live in warm water near reefs.'];
+  const handler = makeTranslateHandler({
+    callModel: modelReply({ translations: S.map((en, i) => ({ en, ko: '번역' + i })) }),
+  });
+  let res = mockRes();
+  await handler(mockReq({ body: { sentences: S } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.translations, ['번역0', '번역1']);
+
+  res = mockRes();
+  await handler(mockReq({ body: { sentences: [] } }), res);
+  assert.equal(res.statusCode, 400);
+});
+
+test('translate: 비밀번호 검사와 모델 오류 문구', async () => {
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    const { makeTranslateHandler } = await import('./handlers.mjs');
+    const S = ['One of the most interesting creatures is the mantis shrimp.'];
+    let res = mockRes();
+    await makeTranslateHandler({ callModel: modelReply({}), passcode: '1234' })(mockReq({ body: { sentences: S } }), res);
+    assert.equal(res.statusCode, 401);
+
+    res = mockRes();
+    await makeTranslateHandler({
+      callModel: async () => {
+        throw new RateLimitError('x');
+      },
+      Anthropic: FakeAnthropic,
+    })(mockReq({ body: { sentences: S } }), res);
+    assert.equal(res.statusCode, 429);
+  } finally {
+    console.error = origError;
+  }
+});

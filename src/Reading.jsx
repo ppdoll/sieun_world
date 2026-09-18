@@ -21,7 +21,7 @@ import { makePassageSet, passageSetTitle, verifiedCount, MAX_PASSAGE_SETS } from
 import { addWordSet, removeWordSet, updateWordSet, findWordSet, markStudied, sortByActivity } from '../shared/wordsets.mjs';
 import { speak, initSpeech } from './speech.js';
 import { SpeakBtn, Steps } from './ui.jsx';
-import { prepareImage, extractPassage, makeQuestions, getPasscode, setPasscode } from './api.js';
+import { prepareImage, extractPassage, makeQuestions, translateSentences, getPasscode, setPasscode } from './api.js';
 import { loadPassageSets, savePassageSets, loadWordSets } from './storage.js';
 
 const READ_STEPS = [
@@ -31,6 +31,41 @@ const READ_STEPS = [
   { key: 'quiz', label: '시험' },
 ];
 const STEP_INDEX = { upload: 0, check: 0, read: 1, evidence: 2, quiz: 3, result: 3 };
+
+/** 문장을 보여주고, 이미 외운 단어를 누르면 뜻이 뜬다 */
+function Sentence({ sentence, wordIndex, className = 'wl-sentence' }) {
+  const [shown, setShown] = useState(null);
+  useEffect(() => setShown(null), [sentence]);
+  const parts = splitSentenceByWords(sentence, wordIndex);
+  return (
+    <p className={className}>
+      {parts.map((p, k) =>
+        p.word ? (
+          <button key={k} className="wl-known" onClick={() => setShown(shown === k ? null : k)}>
+            {p.text}
+            {shown === k && <span className="wl-known-tip">{p.meaning}</span>}
+          </button>
+        ) : (
+          <span key={k}>{p.text}</span>
+        )
+      )}
+    </p>
+  );
+}
+
+/** 문장 번역. 아이가 먼저 읽어보게 기본은 접어 둔다 */
+function Translation({ ko, loading, alwaysOpen = false }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [ko]);
+  if (loading) return <div className="wl-trans wl-trans-wait">뜻을 가져오는 중…</div>;
+  if (!ko) return null;
+  if (alwaysOpen || open) return <div className="wl-trans">{ko}</div>;
+  return (
+    <button className="wl-ghost wl-sm" onClick={() => setOpen(true)}>
+      뜻 보기
+    </button>
+  );
+}
 
 /* ────────────────────────────────────────────────────────────
    1. 지문 사진 올리기
@@ -224,10 +259,13 @@ function Review({ pending, loading, onConfirm, onBack }) {
       ) : (
         <div className="wl-passagebox">
           {sentences.map((s, i) => (
-            <p className="wl-psent" key={i}>
-              <span className="wl-psent-n">{i + 1}</span>
-              {s}
-            </p>
+            <div key={i}>
+              <p className="wl-psent">
+                <span className="wl-psent-n">{i + 1}</span>
+                {s}
+              </p>
+              {pending.translations?.[i] && <p className="wl-psent-ko">{pending.translations[i]}</p>}
+            </div>
           ))}
         </div>
       )}
@@ -292,16 +330,13 @@ function Review({ pending, loading, onConfirm, onBack }) {
    3. 지문 읽기 — 문장 하나씩. 이미 외운 단어에는 뜻을 단다
    ──────────────────────────────────────────────────────────── */
 
-function Read({ sentences, wordIndex, onNext }) {
+function Read({ sentences, translations, transLoading, wordIndex, onNext }) {
   const [i, setI] = useState(0);
-  const [shown, setShown] = useState(null); // 뜻을 펼친 단어
   const sentence = sentences[i] ?? '';
   const last = i === sentences.length - 1;
-  const parts = splitSentenceByWords(sentence, wordIndex);
-  const known = parts.filter((p) => p.word).length;
+  const known = splitSentenceByWords(sentence, wordIndex).filter((p) => p.word).length;
 
   useEffect(() => {
-    setShown(null);
     speak(sentence);
   }, [i]); // eslint-disable-line
 
@@ -314,19 +349,9 @@ function Read({ sentences, wordIndex, onNext }) {
         한 문장씩 소리로 들으며 읽어요.{known > 0 ? ' 밑줄 친 단어는 외운 단어예요. 누르면 뜻이 보여요.' : ''}
       </p>
 
-      <div className="wl-stage">
-        <p className="wl-sentence">
-          {parts.map((p, k) =>
-            p.word ? (
-              <button key={k} className="wl-known" onClick={() => setShown(shown === k ? null : k)}>
-                {p.text}
-                {shown === k && <span className="wl-known-tip">{p.meaning}</span>}
-              </button>
-            ) : (
-              <span key={k}>{p.text}</span>
-            )
-          )}
-        </p>
+      <div className="wl-stage wl-stage-left">
+        <Sentence sentence={sentence} wordIndex={wordIndex} />
+        <Translation ko={translations?.[i]} loading={transLoading} />
         <div className="wl-row wl-center">
           <SpeakBtn text={sentence} label="듣기" big />
           <SpeakBtn text={sentence} label="천천히" rate={0.5} big />
@@ -355,7 +380,7 @@ function Read({ sentences, wordIndex, onNext }) {
    4. 근거 문장 찾기 — 질문의 답이 어느 문장에 있는지 고른다
    ──────────────────────────────────────────────────────────── */
 
-function Evidence({ sentences, questions, seed, onNext }) {
+function Evidence({ sentences, questions, translations, wordIndex, seed, onNext }) {
   const [items] = useState(() => buildEvidenceQuiz(sentences, questions, { seed }));
   const [i, setI] = useState(0);
   const [judged, setJudged] = useState(null);
@@ -423,6 +448,13 @@ function Evidence({ sentences, questions, seed, onNext }) {
           <div className={'wl-verdict ' + (judged.correct ? 'ok' : 'no')}>
             <div className="wl-verdict-t">{judged.correct ? '맞았어요' : '답이 있는 문장은 이거예요'}</div>
             {!judged.correct && <p className="wl-note">고른 문장에는 이 질문의 답이 없어요. 초록색 문장을 다시 읽어볼까요.</p>}
+            <div className="wl-answerbox">
+              <Sentence sentence={item.answerSentence} wordIndex={wordIndex} className="wl-sentence wl-sentence-sm" />
+              <Translation ko={translations?.[item.answerIndex]} alwaysOpen />
+              {splitSentenceByWords(item.answerSentence, wordIndex).some((p) => p.word) && (
+                <p className="wl-note">밑줄 친 단어를 누르면 뜻이 보여요.</p>
+              )}
+            </div>
             <div className="wl-row wl-center">
               <SpeakBtn text={item.answerSentence} label="문장 듣기" />
             </div>
@@ -440,7 +472,7 @@ function Evidence({ sentences, questions, seed, onNext }) {
    5. 모의 시험 — 실제 시험과 같은 여섯 유형
    ──────────────────────────────────────────────────────────── */
 
-function Quiz({ questions, seed, title, subtitle, onDone }) {
+function Quiz({ questions, seed, title, subtitle, sentences, translations, wordIndex, onDone }) {
   const [quiz] = useState(() => buildReadingQuiz(questions, { seed }));
   const [i, setI] = useState(0);
   const [judged, setJudged] = useState(null);
@@ -501,7 +533,10 @@ function Quiz({ questions, seed, title, subtitle, onDone }) {
             {item.evidence ? (
               <>
                 <p className="wl-note">지문에서 답이 있는 곳이에요.</p>
-                <div className="wl-qev wl-qev-big">{item.evidence}</div>
+                <div className="wl-answerbox">
+                  <Sentence sentence={item.evidence} wordIndex={wordIndex} className="wl-sentence wl-sentence-sm" />
+                  <Translation ko={translations?.[(sentences ?? []).indexOf(item.evidence)]} alwaysOpen />
+                </div>
                 <div className="wl-row wl-center">
                   <SpeakBtn text={item.evidence} label="문장 듣기" />
                 </div>
@@ -578,6 +613,8 @@ export default function Reading({ onHome }) {
   const [passage, setPassage] = useState('');
   const [sentences, setSentences] = useState([]);
   const [questions, setQuestions] = useState([]);
+  const [translations, setTranslations] = useState([]);
+  const [transLoading, setTransLoading] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState([]); // 지금 푸는 문제 (오답만 남을 수 있다)
   const [summary, setSummary] = useState(null);
   const [mode, setMode] = useState('quiz');
@@ -619,16 +656,35 @@ export default function Reading({ onHome }) {
     }
   }
 
+  /** 문장 번역을 받아 둔다. 실패해도 읽기는 그대로 된다 */
+  async function loadTranslations(list, id) {
+    if (!list?.length) return;
+    setTransLoading(true);
+    try {
+      const got = await translateSentences(list);
+      const ko = got.translations || [];
+      setTranslations(ko);
+      setPending((p) => ({ ...p, translations: ko }));
+      if (id) commitSets(updateWordSet(setsRef.current, id, { translations: ko }));
+    } catch {
+      // 번역이 없어도 문장 읽기와 시험은 그대로 된다
+    } finally {
+      setTransLoading(false);
+    }
+  }
+
   function onExtracted(got) {
     setPending(got);
+    setTranslations([]);
     setStep('check');
-    // 검수 화면을 보는 동안 모의 문제를 만들어 둔다
+    // 검수 화면을 보는 동안 모의 문제와 번역을 만들어 둔다
     loadQuestions(got.passage, got.questions, null);
+    loadTranslations(got.sentences, null);
   }
 
   /** 검수를 마친 지문으로 시작 */
   function start(checked) {
-    const set = makePassageSet(checked);
+    const set = { ...makePassageSet(checked), translations: checked.translations ?? translations ?? [] };
     commitSets(addWordSet(setsRef.current, set, MAX_PASSAGE_SETS));
     setCurrentId(set.id);
     setPassage(checked.passage);
@@ -637,6 +693,8 @@ export default function Reading({ onHome }) {
     setWrong([]);
     setSummary(null);
     setStep('read');
+    // 검수에서 지문을 고쳤으면 문장이 달라져 번역 자리가 어긋난다. 다시 받는다
+    if (set.translations.length !== checked.sentences.length) loadTranslations(checked.sentences, set.id);
   }
 
   function resume(id) {
@@ -647,9 +705,12 @@ export default function Reading({ onHome }) {
     setPassage(set.passage);
     setSentences(set.sentences);
     setQuestions(set.questions);
+    setTranslations(set.translations || []);
     setWrong([]);
     setSummary(null);
     setStep('read');
+    // 이 기능이 생기기 전에 저장된 지문에는 번역이 없다
+    if ((set.translations || []).length !== set.sentences.length) loadTranslations(set.sentences, id);
   }
 
   function remove(id) {
@@ -679,6 +740,7 @@ export default function Reading({ onHome }) {
     setPassage('');
     setSentences([]);
     setQuestions([]);
+    setTranslations([]);
     setQuizQuestions([]);
     setSummary(null);
     setWrong([]);
@@ -723,13 +785,23 @@ export default function Reading({ onHome }) {
           <Review pending={pending} loading={genLoading} onConfirm={start} onBack={() => setStep('upload')} />
         )}
 
-        {step === 'read' && <Read sentences={sentences} wordIndex={wordIndex} onNext={() => setStep('evidence')} />}
+        {step === 'read' && (
+          <Read
+            sentences={sentences}
+            translations={translations}
+            transLoading={transLoading}
+            wordIndex={wordIndex}
+            onNext={() => setStep('evidence')}
+          />
+        )}
 
         {step === 'evidence' && (
           <Evidence
             key={'e' + seedBump}
             sentences={sentences}
             questions={questions}
+            translations={translations}
+            wordIndex={wordIndex}
             seed={13 + seedBump}
             onNext={() => startQuiz(questions, 'quiz')}
           />
@@ -741,6 +813,9 @@ export default function Reading({ onHome }) {
             <Quiz
               key={mode + seedBump}
               questions={quizQuestions}
+              sentences={sentences}
+              translations={translations}
+              wordIndex={wordIndex}
               seed={(mode === 'review' ? 41 : 17) + seedBump}
               title={mode === 'review' ? '오답 다시 풀기' : '모의 시험'}
               subtitle={

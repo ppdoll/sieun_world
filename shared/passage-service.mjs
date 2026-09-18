@@ -12,6 +12,12 @@ import {
   parseQuestionsResponse,
   mergeQuestions,
   splitSentences,
+  TRANSLATE_SCHEMA,
+  TRANSLATE_SYSTEM,
+  translatePrompt,
+  parseTranslateResponse,
+  missingTranslations,
+  MAX_TRANSLATE_SENTENCES,
 } from './passage-logic.mjs';
 
 /** 모의 문제를 이만큼 못 건지면 한 번 더 만들어 채운다 */
@@ -88,4 +94,43 @@ export async function generateQuestions({ passage, sentences, avoid = [], callMo
     dropped: first.dropped + second.dropped,
     calls,
   };
+}
+
+/**
+ * 문장 번역. 빠진 자리가 많으면 못 받은 문장만 한 번 더 묻는다.
+ * 번역이 맞는지는 기계로 확인할 수 없지만, 어느 문장의 번역인지는 대조해서 넣는다.
+ *
+ * @returns {{status, translations: string[], calls}}
+ */
+export async function translateSentences({ sentences, callModel }) {
+  const list = (Array.isArray(sentences) ? sentences : []).slice(0, MAX_TRANSLATE_SENTENCES);
+  if (list.length === 0) return { status: 'ok', translations: [], calls: 0 };
+
+  let calls = 0;
+  const ask = async (subset) => {
+    calls++;
+    return parseTranslateResponse(
+      await callModel({
+        system: TRANSLATE_SYSTEM,
+        schema: TRANSLATE_SCHEMA,
+        maxTokens: 8000,
+        content: [{ type: 'text', text: translatePrompt(subset) }],
+      }),
+      subset
+    );
+  };
+
+  const first = await ask(list);
+  if (first.status === 'refused') return { status: 'refused', translations: list.map(() => ''), calls };
+
+  const out = [...first.translations];
+  const missingIdx = out.map((t, i) => (t ? -1 : i)).filter((i) => i !== -1);
+  if (missingIdx.length === 0) return { status: 'ok', translations: out, calls };
+
+  // 빠진 문장만 다시 묻는다
+  const retry = await ask(missingIdx.map((i) => list[i]));
+  missingIdx.forEach((orig, k) => {
+    if (retry.translations[k]) out[orig] = retry.translations[k];
+  });
+  return { status: missingTranslations(out, list) === list.length ? retry.status : 'ok', translations: out, calls };
 }

@@ -36,6 +36,7 @@ export function buildEvidenceQuiz(sentences, questions, { seed = 1, choices = EV
       sentences: options,
       answer: options.indexOf(answerSentence),
       answerSentence,
+      answerIndex: q.evidenceIndex, // 지문에서 몇 번째 문장인가 (번역을 찾을 때 쓴다)
     };
   });
 }

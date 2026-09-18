@@ -45,6 +45,7 @@ test('buildEvidenceQuiz: 검증된 문제만 내고 보기에 정답 문장이 �
     assert.ok(SENTENCES.includes(it.answerSentence));
     assert.equal(new Set(it.sentences).size, 4, '보기 문장이 겹치지 않는다');
     for (const s of it.sentences) assert.ok(SENTENCES.includes(s), '보기는 모두 지문 문장이어야 한다');
+    assert.equal(SENTENCES[it.answerIndex], it.answerSentence, '번역을 찾을 수 있게 지문 안의 자리도 준다');
   }
 });
 

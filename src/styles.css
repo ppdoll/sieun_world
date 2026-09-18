@@ -243,3 +243,12 @@ body{background:#EDF3F8}
 .wl-type.weak{background:#FFF7D6;border-color:#F0DFA0}
 .wl-type-l{font-size:13px;font-weight:800}
 .wl-type-n{font-size:12.5px;color:var(--ink2);font-weight:700}
+
+/* ── 문장 번역 ── */
+.wl-trans{background:#F3F8FC;border-left:3px solid var(--acc);border-radius:0 10px 10px 0;padding:10px 12px;
+  font-size:15px;line-height:1.75;color:var(--ink);word-break:keep-all}
+.wl-trans-wait{color:var(--ink2);font-size:13px;border-left-color:var(--line)}
+.wl-psent-ko{font-size:13px;line-height:1.7;color:var(--ink2);margin:0 0 10px;padding-left:26px;word-break:keep-all}
+.wl-answerbox{width:100%;background:#F7FBFE;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;
+  gap:8px;text-align:left}
+.wl-sentence-sm{font-size:17px;line-height:1.8}

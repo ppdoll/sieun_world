@@ -3,8 +3,8 @@
 // callModel 과 passcode 를 주입받으므로 SDK 없이 테스트할 수 있다.
 
 import { extractWordsFromImage, extractPhonicsRules, extractStory } from '../../shared/extract-service.mjs';
-import { extractPassageFromImage, generateQuestions } from '../../shared/passage-service.mjs';
-import { cleanPassage, splitSentences, MAX_PASSAGE_CHARS } from '../../shared/passage-logic.mjs';
+import { extractPassageFromImage, generateQuestions, translateSentences } from '../../shared/passage-service.mjs';
+import { cleanPassage, splitSentences, MAX_PASSAGE_CHARS, MAX_TRANSLATE_SENTENCES } from '../../shared/passage-logic.mjs';
 
 export const MAX_IMAGE_BASE64 = 3_000_000; // 약 2.2MB. Vercel 요청 본문 한도(4.5MB) 안쪽
 export const MAX_PHONICS_WORDS = 80;
@@ -228,6 +228,35 @@ export function makeQuestionsHandler({ callModel, passcode, Anthropic } = {}) {
     } catch (err) {
       const { status, error } = describeModelError(err, Anthropic);
       console.error('[questions]', err?.status ?? '', err?.message ?? err);
+      return send(res, status, { error });
+    }
+  };
+}
+
+/**
+ * POST /api/extract/translate
+ * body: { sentences: string[] }
+ * 200: { translations: string[], status, calls }  — 문장 수와 길이가 같다. 못 받은 자리는 빈 문자열
+ */
+export function makeTranslateHandler({ callModel, passcode, Anthropic } = {}) {
+  return async function translateHandler(req, res) {
+    const body = gate(req, res, passcode);
+    if (!body) return;
+
+    const sentences = (Array.isArray(body.sentences) ? body.sentences : [])
+      .filter((s) => typeof s === 'string' && s.trim())
+      .map((s) => s.trim())
+      .slice(0, MAX_TRANSLATE_SENTENCES);
+    if (sentences.length === 0) {
+      return send(res, 400, { error: '문장이 없어요. 먼저 사진에서 지문을 뽑아주세요.' });
+    }
+
+    try {
+      const result = await translateSentences({ sentences, callModel });
+      return send(res, 200, result);
+    } catch (err) {
+      const { status, error } = describeModelError(err, Anthropic);
+      console.error('[translate]', err?.status ?? '', err?.message ?? err);
       return send(res, status, { error });
     }
   };

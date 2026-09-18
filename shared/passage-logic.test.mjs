@@ -290,3 +290,71 @@ test('splitSentenceByWords: 지문의 변화형도 원형 단어로 잡아 뜻�
   assert.equal(marked[1].meaning, '산호초');
   assert.equal(parts.map((p) => p.text).join(''), 'These creatures live around coral reefs and recognized us.');
 });
+
+/* ── 문장 번역 ─────────────────────────────────────────────────── */
+
+test('sanitizeTranslations: 영어 문장을 대조해 제자리에 놓는다', async () => {
+  const { sanitizeTranslations } = await import('./passage-logic.mjs');
+  const out = sanitizeTranslations(
+    [
+      { en: SENTENCES[1], ko: '그들은 15~30cm 이고 따뜻한 물의 산호초 주변에 산다.' },
+      { en: SENTENCES[0], ko: '  가장  흥미로운 생물 중 하나는 갯가재다. ' },
+    ],
+    SENTENCES
+  );
+  assert.equal(out.length, SENTENCES.length);
+  assert.equal(out[0], '가장 흥미로운 생물 중 하나는 갯가재다.');
+  assert.match(out[1], /산호초/);
+  assert.equal(out[2], '', '안 온 자리는 빈 문자열');
+});
+
+test('sanitizeTranslations: 지문에 없는 문장의 번역은 버린다 (엉뚱한 자리 방지)', async () => {
+  const { sanitizeTranslations } = await import('./passage-logic.mjs');
+  const out = sanitizeTranslations(
+    [
+      { en: 'Mantis shrimp can fly to the moon at night.', ko: '갯가재는 달에 날아간다.' },
+      { en: SENTENCES[0], ko: '' },
+    ],
+    SENTENCES
+  );
+  assert.deepEqual(out, SENTENCES.map(() => ''));
+  assert.deepEqual(sanitizeTranslations(null, SENTENCES).length, SENTENCES.length);
+  assert.deepEqual(sanitizeTranslations([], null), []);
+});
+
+test('sanitizeTranslations: 같은 문장에 두 번 오면 먼저 온 것만 쓴다', async () => {
+  const { sanitizeTranslations } = await import('./passage-logic.mjs');
+  const out = sanitizeTranslations(
+    [
+      { en: SENTENCES[0], ko: '첫 번째 번역' },
+      { en: SENTENCES[0], ko: '두 번째 번역' },
+    ],
+    SENTENCES
+  );
+  assert.equal(out[0], '첫 번째 번역');
+});
+
+test('parseTranslateResponse: 실패해도 문장 수만큼의 빈 배열을 준다', async () => {
+  const { parseTranslateResponse } = await import('./passage-logic.mjs');
+  assert.deepEqual(parseTranslateResponse(null, SENTENCES).translations.length, SENTENCES.length);
+  assert.equal(parseTranslateResponse(msg('번역 못 해요'), SENTENCES).status, 'unparsable');
+  assert.equal(parseTranslateResponse({ content: [], stop_reason: 'refusal' }, SENTENCES).status, 'refused');
+  const ok = parseTranslateResponse(msg({ translations: [{ en: SENTENCES[0], ko: '첫 문장' }] }), SENTENCES);
+  assert.equal(ok.status, 'ok');
+  assert.equal(ok.translations[0], '첫 문장');
+});
+
+test('missingTranslations: 빠진 자리 수를 센다', async () => {
+  const { missingTranslations } = await import('./passage-logic.mjs');
+  assert.equal(missingTranslations(['가', '', '다', '', ''], SENTENCES), 3);
+  assert.equal(missingTranslations([], SENTENCES), 5);
+  assert.equal(missingTranslations(null, null), 0);
+});
+
+test('translatePrompt: 문장에 번호를 붙이고 글자 그대로 옮기라고 알린다', async () => {
+  const { translatePrompt } = await import('./passage-logic.mjs');
+  const p = translatePrompt(SENTENCES);
+  assert.match(p, /1\. One of the most/);
+  assert.match(p, /글자 그대로/);
+  assert.match(p, /초등 4학년/);
+});

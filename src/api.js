@@ -133,6 +133,14 @@ export function makeQuestions(passage, avoid = []) {
   return post('/api/extract/questions', { passage, avoid });
 }
 
+/**
+ * 지문 문장들 → { translations }. 문장 수와 길이가 같고, 못 받은 자리는 빈 문자열.
+ * 번역이 맞는지는 확인할 수 없지만 어느 문장의 번역인지는 서버가 대조해서 넣는다.
+ */
+export function translateSentences(sentences) {
+  return post('/api/extract/translate', { sentences });
+}
+
 /* ── 공유 저장 (git data 브랜치, 최근 5개). 다른 기기와 단어장을 나눈다 ── */
 
 /** → { sets, disabled? } */
