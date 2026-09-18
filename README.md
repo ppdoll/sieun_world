@@ -53,6 +53,10 @@
 
 ## 2. 화면 흐름
 
+첫 화면에서 **단어 외우기**와 **독해 연습** 중 하나를 고른다. 둘은 저장소도 화면도 따로다.
+
+### 단어 외우기
+
 ```
 [1] 사진 올리기
      ↓  단어·뜻·발음덩어리 추출 + 파닉스 규칙 5개
@@ -86,6 +90,37 @@
 유형은 `types[i % types.length]`로 순환 배정한다. 랜덤 배정하면 한쪽으로 쏠려서 받아쓰기가 하나도 안 나오는 회차가 생긴다.
 
 ---
+
+### 독해 연습
+
+같은 교재의 읽기 지문으로 **다음 시험을 미리 겪게** 하는 흐름이다. 시험지의 지문이 교재 지문과 글자까지 같고, 문제도 늘 같은 여섯 유형으로 나온다는 점을 그대로 이용한다.
+
+```
+[1] 지문 사진 올리기
+     ↓  지문 + 교재에 인쇄된 문제 추출, 이어서 모의 문제 생성
+[2] 검수 — 지문 수정, 문제별 정답 바꾸기·지우기
+     ↓
+[3] 지문 읽기 — 문장 하나씩. 이미 외운 단어에는 뜻을 단다
+     ↓
+[4] 근거 문장 찾기 — 질문의 답이 어느 문장에 있는지 고른다
+     ↓
+[5] 모의 시험 — 여섯 유형 4지선다. 답을 고르면 근거 문장을 보여준다
+     ↓
+[6] 결과 — 유형별 성적. 약한 유형을 표시하고 틀린 것만 다시 푼다
+```
+
+| 유형 | 생김새 |
+|---|---|
+| `main` 주제 | What is this passage mainly about? |
+| `blank` 빈칸 | Choose the best word to fill in the blank |
+| `true` 일치 | Which of the following is true about...? |
+| `nottrue` 불일치 | which of the following is NOT true? |
+| `detail` 세부 | What helps animals find food? |
+| `intent` 의도 | Why does the writer mention a bullet? |
+
+**모든 문제는 근거 문장과 함께 받는다.** 그 문장이 지문에 글자 그대로 있는지 검사하고, 없으면 그 문제를 통째로 버린다(`sanitizeQuestions`). 지어낸 문제가 아이에게 가지 않게 막는 장치이고, 덩어리 철자 검증과 같은 원리다. 주제와 의도는 한 문장으로 근거를 댈 수 없어 검증에서 빠지는 대신 검수 화면에 노란색으로 표시된다.
+
+`근거 문장 찾기`는 검증된 문제만 낸다. 오답 보기도 같은 지문의 다른 문장이라 "지문에서 찾는" 연습이 된다.
 
 ## 3. 핵심 기능
 
@@ -163,6 +198,18 @@ shared/                   프론트와 서버가 함께 import 하는 순수 로
   extract-logic.mjs       프롬프트, 응답 해석(잘림/거절/복구/검증), 검수 플래그
   extract-service.mjs     추출 흐름 조율 (모델 호출 함수를 주입받음)
 prototype/word-lab.jsx    Claude 아티팩트 원본. 참고용, 빌드에 포함되지 않음
+
+독해 연습이 더해지면서 파일이 나뉘었다.
+  src/App.jsx             첫 화면(단어/독해 고르기) + 두 흐름 전환
+  src/WordLab.jsx         단어 외우기 흐름
+  src/Reading.jsx         독해 연습 흐름
+  src/ui.jsx              두 흐름이 함께 쓰는 조각 (덩어리 칩, 듣기 버튼, 단계 표시)
+  shared/passage-logic.mjs   지문·문제 해석과 근거 문장 검증
+  shared/passage-service.mjs 지문 추출 흐름 조율
+  shared/reading-quiz.mjs    근거 찾기·모의 시험 문제지와 채점
+  shared/passagesets.mjs     지문 목록
+  api/extract/passage.js     POST /api/extract/passage    사진 → 지문 + 교재 문제
+  api/extract/questions.js   POST /api/extract/questions  지문 → 모의 문제
 ```
 
 ```bash

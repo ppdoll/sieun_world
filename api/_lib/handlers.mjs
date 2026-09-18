@@ -3,6 +3,8 @@
 // callModel 과 passcode 를 주입받으므로 SDK 없이 테스트할 수 있다.
 
 import { extractWordsFromImage, extractPhonicsRules, extractStory } from '../../shared/extract-service.mjs';
+import { extractPassageFromImage, generateQuestions } from '../../shared/passage-service.mjs';
+import { cleanPassage, splitSentences, MAX_PASSAGE_CHARS } from '../../shared/passage-logic.mjs';
 
 export const MAX_IMAGE_BASE64 = 3_000_000; // 약 2.2MB. Vercel 요청 본문 한도(4.5MB) 안쪽
 export const MAX_PHONICS_WORDS = 80;
@@ -66,17 +68,8 @@ export function makeExtractHandler({ callModel, passcode, Anthropic } = {}) {
   return async function extractHandler(req, res) {
     const body = gate(req, res, passcode);
     if (!body) return;
-
-    const image = body.image;
-    if (!image || typeof image.data !== 'string' || !image.data) {
-      return send(res, 400, { error: '사진이 들어오지 않았어요. 다시 골라주세요.' });
-    }
-    if (!IMAGE_TYPES.has(image.mediaType)) {
-      return send(res, 400, { error: '이 사진 형식은 읽을 수 없어요. JPG나 PNG로 보내주세요.' });
-    }
-    if (image.data.length > MAX_IMAGE_BASE64) {
-      return send(res, 413, { error: '사진이 너무 커요. 조금 작게 찍어서 다시 올려주세요.' });
-    }
+    const image = imageFromBody(body, res);
+    if (!image) return;
 
     try {
       const result = await extractWordsFromImage({ image, callModel });
@@ -96,6 +89,24 @@ export function makeExtractHandler({ callModel, passcode, Anthropic } = {}) {
       return send(res, status, { error });
     }
   };
+}
+
+/** body.image 를 검사한다. 잘못됐으면 4xx 를 보내고 null */
+function imageFromBody(body, res) {
+  const image = body.image;
+  if (!image || typeof image.data !== 'string' || !image.data) {
+    send(res, 400, { error: '사진이 들어오지 않았어요. 다시 골라주세요.' });
+    return null;
+  }
+  if (!IMAGE_TYPES.has(image.mediaType)) {
+    send(res, 400, { error: '이 사진 형식은 읽을 수 없어요. JPG나 PNG로 보내주세요.' });
+    return null;
+  }
+  if (image.data.length > MAX_IMAGE_BASE64) {
+    send(res, 413, { error: '사진이 너무 커요. 조금 작게 찍어서 다시 올려주세요.' });
+    return null;
+  }
+  return image;
 }
 
 /** body.words 를 정리한다. 없으면 400 을 보내고 null */
@@ -154,6 +165,69 @@ export function makeStoryHandler({ callModel, passcode, Anthropic } = {}) {
     } catch (err) {
       const { status, error } = describeModelError(err, Anthropic);
       console.error('[story]', err?.status ?? '', err?.message ?? err);
+      return send(res, status, { error });
+    }
+  };
+}
+
+/**
+ * POST /api/extract/passage
+ * body: { image: { data: base64, mediaType } }
+ * 200: { title, passage, sentences, questions, dropped, status, calls }
+ */
+export function makePassageHandler({ callModel, passcode, Anthropic } = {}) {
+  return async function passageHandler(req, res) {
+    const body = gate(req, res, passcode);
+    if (!body) return;
+    const image = imageFromBody(body, res);
+    if (!image) return;
+
+    try {
+      const result = await extractPassageFromImage({ image, callModel });
+      if (result.status === 'refused') {
+        return send(res, 422, { error: '이 사진은 읽을 수 없었어요. 지문 페이지만 나오게 다시 찍어주세요.' });
+      }
+      if (!result.passage) {
+        return send(res, 422, { error: '지문을 찾지 못했어요. 글자가 잘 보이게 다시 찍어주세요.' });
+      }
+      return send(res, 200, result);
+    } catch (err) {
+      const { status, error } = describeModelError(err, Anthropic);
+      console.error('[passage]', err?.status ?? '', err?.message ?? err);
+      return send(res, status, { error });
+    }
+  };
+}
+
+/**
+ * POST /api/extract/questions
+ * body: { passage, avoid?: string[] }
+ * 200: { questions, dropped, status, calls }
+ * 사진을 다시 읽지 않으므로 "문제 다시 만들기" 를 눌러도 지문 분석 비용이 들지 않는다.
+ */
+export function makeQuestionsHandler({ callModel, passcode, Anthropic } = {}) {
+  return async function questionsHandler(req, res) {
+    const body = gate(req, res, passcode);
+    if (!body) return;
+
+    const passage = cleanPassage(body.passage);
+    if (!passage) {
+      return send(res, 400, { error: '지문이 없어요. 먼저 사진에서 지문을 뽑아주세요.' });
+    }
+    if (String(body.passage).length > MAX_PASSAGE_CHARS * 2) {
+      return send(res, 413, { error: '지문이 너무 길어요. 한 쪽씩 나눠서 올려주세요.' });
+    }
+    const sentences = splitSentences(passage);
+    const avoid = (Array.isArray(body.avoid) ? body.avoid : [])
+      .filter((s) => typeof s === 'string' && s.trim())
+      .slice(0, 30);
+
+    try {
+      const result = await generateQuestions({ passage, sentences, avoid, callModel });
+      return send(res, 200, result);
+    } catch (err) {
+      const { status, error } = describeModelError(err, Anthropic);
+      console.error('[questions]', err?.status ?? '', err?.message ?? err);
       return send(res, status, { error });
     }
   };

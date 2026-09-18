@@ -223,3 +223,123 @@ test('story: 단어가 없으면 400, 비밀번호 검사 적용, 모델 오류�
     console.error = origError;
   }
 });
+
+/* ── 독해: 지문·문제 ─────────────────────────────────────────── */
+
+const PASSAGE =
+  'One of the most interesting creatures is the mantis shrimp. ' +
+  'They are 15 to 30cm long and live around coral reefs in warm water. ' +
+  'Being able to see colors help animals find food and a mate.';
+const RQ = {
+  type: 'detail',
+  question: 'What helps animals find food?',
+  options: ['being able to see colors', 'groups', 'strength', 'thickness'],
+  answer: 0,
+  evidence: 'Being able to see colors help animals find food and a mate.',
+};
+const modelReply = (obj, stop_reason = 'end_turn') => async () => ({
+  content: [{ type: 'text', text: JSON.stringify(obj) }],
+  stop_reason,
+});
+
+test('passage: 정상 경로 — 지문, 문장, 문제를 돌려준다', async () => {
+  const { makePassageHandler } = await import('./handlers.mjs');
+  const handler = makePassageHandler({
+    callModel: modelReply({ title: 'The Mantis Shrimp', passage: PASSAGE, questions: [RQ] }),
+  });
+  const res = mockRes();
+  await handler(mockReq({ body: { image: IMAGE } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, 'ok');
+  assert.equal(res.body.title, 'The Mantis Shrimp');
+  assert.equal(res.body.sentences.length, 3);
+  assert.equal(res.body.questions.length, 1);
+  assert.equal(res.body.questions[0].verified, true);
+});
+
+test('passage: 지문을 못 찾으면 422, 거절도 422, 사진 검사는 extract 와 같다', async () => {
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    const { makePassageHandler } = await import('./handlers.mjs');
+    let res = mockRes();
+    await makePassageHandler({ callModel: modelReply({ title: '', passage: '', questions: [] }) })(
+      mockReq({ body: { image: IMAGE } }),
+      res
+    );
+    assert.equal(res.statusCode, 422);
+    assert.match(res.body.error, /다시 찍어/);
+
+    res = mockRes();
+    await makePassageHandler({ callModel: async () => ({ content: [], stop_reason: 'refusal' }) })(
+      mockReq({ body: { image: IMAGE } }),
+      res
+    );
+    assert.equal(res.statusCode, 422);
+
+    res = mockRes();
+    await makePassageHandler({ callModel: modelReply({ passage: PASSAGE, questions: [] }) })(mockReq({ body: {} }), res);
+    assert.equal(res.statusCode, 400);
+
+    res = mockRes();
+    await makePassageHandler({ callModel: modelReply({ passage: PASSAGE, questions: [] }) })(
+      mockReq({ body: { image: { data: 'QUJD', mediaType: 'image/heic' } } }),
+      res
+    );
+    assert.equal(res.statusCode, 400);
+  } finally {
+    console.error = origError;
+  }
+});
+
+test('passage: 비밀번호 검사와 모델 오류 문구', async () => {
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    const { makePassageHandler } = await import('./handlers.mjs');
+    let res = mockRes();
+    await makePassageHandler({ callModel: modelReply({}), passcode: '1234' })(mockReq({ body: { image: IMAGE } }), res);
+    assert.equal(res.statusCode, 401);
+
+    res = mockRes();
+    await makePassageHandler({
+      callModel: async () => {
+        throw new RateLimitError('x');
+      },
+      Anthropic: FakeAnthropic,
+    })(mockReq({ body: { image: IMAGE } }), res);
+    assert.equal(res.statusCode, 429);
+  } finally {
+    console.error = origError;
+  }
+});
+
+test('questions: 지문 텍스트만 받아 문제를 만든다 (사진을 다시 읽지 않는다)', async () => {
+  const { makeQuestionsHandler } = await import('./handlers.mjs');
+  const many = Array.from({ length: 6 }, (_, i) => ({ ...RQ, question: 'Q' + i + ' about shrimp?' }));
+  let seen = null;
+  const handler = makeQuestionsHandler({
+    callModel: async (req) => {
+      seen = req.content;
+      return { content: [{ type: 'text', text: JSON.stringify({ questions: many }) }], stop_reason: 'end_turn' };
+    },
+  });
+  const res = mockRes();
+  await handler(mockReq({ body: { passage: PASSAGE, avoid: ['Q0 about shrimp?'] } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.questions.length, 6);
+  assert.equal(seen.every((c) => c.type === 'text'), true, '이미지 블록이 없어야 한다');
+  assert.match(seen[0].text, /Q0 about shrimp\?/);
+});
+
+test('questions: 지문이 비면 400, 너무 길면 413', async () => {
+  const { makeQuestionsHandler } = await import('./handlers.mjs');
+  const handler = makeQuestionsHandler({ callModel: modelReply({ questions: [] }) });
+  let res = mockRes();
+  await handler(mockReq({ body: { passage: '   ' } }), res);
+  assert.equal(res.statusCode, 400);
+
+  res = mockRes();
+  await handler(mockReq({ body: { passage: 'x '.repeat(9000) } }), res);
+  assert.equal(res.statusCode, 413);
+});

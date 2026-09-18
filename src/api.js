@@ -118,6 +118,21 @@ export function extractStory(words) {
   return post('/api/extract/story', { words });
 }
 
+/* ── 독해 ── */
+
+/** 지문 사진 1장 → { title, passage, sentences, questions, status } */
+export function extractPassage(image) {
+  return post('/api/extract/passage', { image });
+}
+
+/**
+ * 지문 텍스트 → { questions, status }. 사진을 다시 읽지 않으므로
+ * "문제 다시 만들기" 를 눌러도 지문 분석 비용이 들지 않는다.
+ */
+export function makeQuestions(passage, avoid = []) {
+  return post('/api/extract/questions', { passage, avoid });
+}
+
 /* ── 공유 저장 (git data 브랜치, 최근 5개). 다른 기기와 단어장을 나눈다 ── */
 
 /** → { sets, disabled? } */

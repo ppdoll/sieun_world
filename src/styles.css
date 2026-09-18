@@ -193,3 +193,53 @@ body{background:#EDF3F8}
 .wl-passinput{border:2px solid var(--line);border-radius:12px;padding:12px;font-size:20px;font-family:inherit;
   letter-spacing:.2em;text-align:center;color:var(--ink)}
 .wl-passinput:focus{outline:none;border-color:var(--acc)}
+
+/* ── 첫 화면 고르기 ── */
+.wl-home{background:none;border:none;color:var(--ink2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;padding:6px 0}
+.wl-home:hover{color:var(--acc)}
+.wl-pick{display:flex;gap:14px;align-items:flex-start;text-align:left;width:100%;background:var(--card);
+  border:1.5px solid var(--line);border-radius:18px;padding:20px 18px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.wl-pick:hover{border-color:var(--acc);background:#F7FBFE}
+.wl-pick-ico{font-size:32px;line-height:1.1;flex:none}
+.wl-pick-body{display:flex;flex-direction:column;gap:6px;min-width:0}
+.wl-pick-t{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.wl-pick-s{font-size:13.5px;line-height:1.6;color:var(--ink2)}
+.wl-pick-n{font-size:12.5px;color:var(--acc);font-weight:700}
+
+/* ── 독해: 지문 ── */
+.wl-passagebox{background:var(--card);border-radius:16px;padding:14px 16px}
+.wl-psent{font-size:15px;line-height:1.85;margin:0 0 8px;padding-left:26px;text-indent:-26px;word-break:keep-all}
+.wl-psent-n{display:inline-block;width:20px;margin-right:6px;color:var(--ink2);font-size:12px;font-weight:700;text-indent:0}
+.wl-sentence{font-size:22px;line-height:1.9;margin:0;text-align:left;word-break:keep-all;font-weight:700}
+.wl-known{background:none;border:none;border-bottom:2.5px solid var(--hl);padding:0 1px;font:inherit;color:var(--ink);
+  cursor:pointer;position:relative}
+.wl-known-tip{position:absolute;left:50%;transform:translateX(-50%);top:100%;margin-top:4px;white-space:nowrap;
+  background:var(--ink);color:#fff;font-size:13px;font-weight:700;border-radius:8px;padding:4px 9px;z-index:2}
+.wl-stage-left{align-items:stretch;text-align:left}
+
+/* ── 독해: 문제 ── */
+.wl-review-head{display:flex;justify-content:space-between;align-items:baseline;padding:6px 2px 0}
+.wl-review-t{font-size:14px;font-weight:800}
+.wl-qcard{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px;display:flex;
+  flex-direction:column;gap:10px}
+.wl-qcard.flagged{background:#FFFBE6;border-color:#F0DFA0}
+.wl-qhead{display:flex;justify-content:space-between;align-items:center}
+.wl-qtext{font-size:15px;font-weight:700;line-height:1.6;word-break:keep-all}
+.wl-qtext-big{font-size:19px;line-height:1.65}
+.wl-qopts{display:flex;flex-direction:column;gap:5px}
+.wl-qopt{text-align:left;background:#F3F8FC;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;
+  font-size:14px;font-family:inherit;color:var(--ink);cursor:pointer;line-height:1.5}
+.wl-qopt.on{background:#E4F5EC;border-color:var(--ok);color:#1F7A50;font-weight:800}
+.wl-qev{font-size:12.5px;line-height:1.6;color:var(--ink2);background:#F3F8FC;border-radius:8px;padding:8px 10px}
+.wl-qev-big{font-size:15px;color:var(--ink);line-height:1.7;font-weight:700}
+.wl-opt-sent{font-size:15px;line-height:1.65;text-align:left;word-break:keep-all;font-weight:600}
+.wl-opt.no{background:#FDF0EE;border-color:var(--no);color:#A33B2E}
+.wl-regen{align-self:center;margin-top:4px}
+
+/* ── 독해: 유형별 결과 ── */
+.wl-types{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.wl-type{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:8px 12px;display:flex;
+  gap:8px;align-items:baseline}
+.wl-type.weak{background:#FFF7D6;border-color:#F0DFA0}
+.wl-type-l{font-size:13px;font-weight:800}
+.wl-type-n{font-size:12.5px;color:var(--ink2);font-weight:700}
