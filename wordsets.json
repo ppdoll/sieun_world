@@ -1,6 +1,361 @@
 {
   "sets": [
     {
+      "id": "1789996035506-btt6",
+      "at": 1789996035506,
+      "words": [
+        {
+          "word": "drawer",
+          "meaning": "서랍",
+          "chunks": [
+            "draw",
+            "er"
+          ]
+        },
+        {
+          "word": "deception",
+          "meaning": "속임, 기만, 사기",
+          "chunks": [
+            "de",
+            "cep",
+            "tion"
+          ]
+        },
+        {
+          "word": "masterpiece",
+          "meaning": "걸작",
+          "chunks": [
+            "mas",
+            "ter",
+            "piece"
+          ]
+        },
+        {
+          "word": "inspire",
+          "meaning": "영감을 주다",
+          "chunks": [
+            "in",
+            "spire"
+          ]
+        },
+        {
+          "word": "elaborate",
+          "meaning": "정교한",
+          "chunks": [
+            "e",
+            "lab",
+            "o",
+            "rate"
+          ]
+        },
+        {
+          "word": "fashion",
+          "meaning": "패션",
+          "chunks": [
+            "fash",
+            "ion"
+          ]
+        },
+        {
+          "word": "overlook",
+          "meaning": "내려다보다",
+          "chunks": [
+            "o",
+            "ver",
+            "look"
+          ]
+        },
+        {
+          "word": "scene",
+          "meaning": "장면",
+          "chunks": [
+            "scene"
+          ]
+        },
+        {
+          "word": "donate",
+          "meaning": "기부하다",
+          "chunks": [
+            "do",
+            "nate"
+          ]
+        },
+        {
+          "word": "government",
+          "meaning": "정부",
+          "chunks": [
+            "gov",
+            "ern",
+            "ment"
+          ]
+        },
+        {
+          "word": "deep",
+          "meaning": "깊은",
+          "chunks": [
+            "deep"
+          ]
+        },
+        {
+          "word": "attach",
+          "meaning": "부착하다, (~에) 의미, 가치 등을 두다",
+          "chunks": [
+            "at",
+            "tach"
+          ]
+        },
+        {
+          "word": "considerate",
+          "meaning": "사려 깊은, 이해심이 많은",
+          "chunks": [
+            "con",
+            "sid",
+            "er",
+            "ate"
+          ]
+        },
+        {
+          "word": "glorify",
+          "meaning": "찬양하다, 찬미하다, 미화하다",
+          "chunks": [
+            "glo",
+            "ri",
+            "fy"
+          ]
+        },
+        {
+          "word": "pole",
+          "meaning": "극",
+          "chunks": [
+            "pole"
+          ]
+        },
+        {
+          "word": "decoration",
+          "meaning": "장식품",
+          "chunks": [
+            "dec",
+            "o",
+            "ra",
+            "tion"
+          ]
+        },
+        {
+          "word": "compare",
+          "meaning": "비교하다, 견주다",
+          "chunks": [
+            "com",
+            "pare"
+          ]
+        },
+        {
+          "word": "signify",
+          "meaning": "의미하다, 나타내다",
+          "chunks": [
+            "sig",
+            "ni",
+            "fy"
+          ]
+        },
+        {
+          "word": "valuable",
+          "meaning": "값비싼, 귀중한",
+          "chunks": [
+            "val",
+            "u",
+            "a",
+            "ble"
+          ]
+        },
+        {
+          "word": "courtesy",
+          "meaning": "공손함, 예의바름",
+          "chunks": [
+            "cour",
+            "te",
+            "sy"
+          ]
+        },
+        {
+          "word": "shiny",
+          "meaning": "반짝거리는",
+          "chunks": [
+            "shi",
+            "ny"
+          ]
+        },
+        {
+          "word": "expensive",
+          "meaning": "비싼",
+          "chunks": [
+            "ex",
+            "pen",
+            "sive"
+          ]
+        },
+        {
+          "word": "gift",
+          "meaning": "선물",
+          "chunks": [
+            "gift"
+          ]
+        },
+        {
+          "word": "afraid",
+          "meaning": "두려워하는, 걱정하는",
+          "chunks": [
+            "a",
+            "fraid"
+          ]
+        },
+        {
+          "word": "special",
+          "meaning": "특별한",
+          "chunks": [
+            "spe",
+            "cial"
+          ]
+        },
+        {
+          "word": "meaningful",
+          "meaning": "의미 있는, 중요한",
+          "chunks": [
+            "mean",
+            "ing",
+            "ful"
+          ]
+        },
+        {
+          "word": "a large amount of",
+          "meaning": "다량의",
+          "chunks": [
+            "a large",
+            "amount",
+            "of"
+          ]
+        },
+        {
+          "word": "wonder",
+          "meaning": "궁금하다, 놀라움",
+          "chunks": [
+            "won",
+            "der"
+          ]
+        },
+        {
+          "word": "beautiful",
+          "meaning": "아름다운",
+          "chunks": [
+            "beau",
+            "ti",
+            "ful"
+          ]
+        },
+        {
+          "word": "vast",
+          "meaning": "광대한, 거대한",
+          "chunks": [
+            "vast"
+          ]
+        }
+      ],
+      "phonics": [
+        {
+          "pattern": "-tion",
+          "letters": [
+            "tion"
+          ],
+          "sound": "션",
+          "tip": "티온이 아니라 션! 동작이나 상태를 나타내는 명사 끝에 자주 나와요.",
+          "words": [
+            "deception",
+            "decoration"
+          ]
+        },
+        {
+          "pattern": "-ify",
+          "letters": [
+            "ify"
+          ],
+          "sound": "파이",
+          "tip": "이파이라고 읽지 말고 '파이'로 짧게! 동사를 만드는 꼬리표예요.",
+          "words": [
+            "glorify",
+            "signify"
+          ]
+        },
+        {
+          "pattern": "-ate",
+          "letters": [
+            "ate"
+          ],
+          "sound": "에이트",
+          "tip": "매직 e처럼 앞의 a가 '에이'로 길게 소리나요.",
+          "words": [
+            "elaborate",
+            "donate",
+            "considerate"
+          ]
+        },
+        {
+          "pattern": "ee",
+          "letters": [
+            "ee"
+          ],
+          "sound": "이",
+          "tip": "e가 두 개 붙으면 길게 '이'하고 웃는 소리가 나요.",
+          "words": [
+            "deep"
+          ]
+        },
+        {
+          "pattern": "sh",
+          "letters": [
+            "sh"
+          ],
+          "sound": "쉬",
+          "tip": "조용히 하라는 듯 '쉬~' 소리를 내는 글자 조합이에요.",
+          "words": [
+            "fashion",
+            "shiny"
+          ]
+        }
+      ],
+      "mnemonics": {
+        "drawer": "드로어~ 서랍을 드르륵 끌어당기는 소리!",
+        "deception": "디셥션~ 속임수에 빠진 소년, 뎁! 속았다!",
+        "masterpiece": "마스터피스~ 마스터가 만든 피자 같은 명작!",
+        "inspire": "인스파이어~ 불이 붙듯 마음에 스파크가 튀는 느낌!",
+        "elaborate": "일래버레이트~ 이래저래 자세히 설명하는 거예요!",
+        "fashion": "패션~ 옷 입고 패셔니스타처럼 걷는 느낌!",
+        "overlook": "오버룩~ 위에서 오버해서 훅 넘겨 못 본 거예요!",
+        "scene": "씬~ 영화 씬처럼 장면이 눈앞에 펼쳐져요!",
+        "donate": "도네이트~ 도너츠를 나눠주는 착한 마음!",
+        "government": "거버먼트~ 거대한 정부가 법을 만드는 곳!",
+        "deep": "딥~ 깊은 바다에 딥다이빙 하는 소리!",
+        "attach": "어태치~ 어! 태그를 착 붙이는 소리!",
+        "considerate": "컨시더레이트~ 콘을 생각하며 배려하는 친구!",
+        "glorify": "글로리파이~ 글로리(영광)를 파이처럼 나눠줘요!",
+        "pole": "폴~ 폴대 하나 딱 세워놓은 모습!",
+        "decoration": "데코레이션~ 데코 리본으로 장식하는 소리!",
+        "compare": "컴페어~ 컴퓨터로 페어(짝) 비교하기!",
+        "signify": "시그니파이~ 사인을 파이처럼 나눠서 뜻을 알려줘요!",
+        "valuable": "밸류어블~ 밸류(가치) 있는 보물 같은 물건!",
+        "courtesy": "커티시~ 커피 대접하는 예의 바른 손님!",
+        "shiny": "샤이니~ 반짝반짝 부끄러운 듯 빛나는 별!",
+        "expensive": "익스펜시브~ 펜 하나도 비싸다고 놀란 소리!",
+        "gift": "기프트~ 기쁘게 선물을 받는 소리!",
+        "afraid": "어프레이드~ 어! 프레이가 무서워서 도망가요!",
+        "special": "스페셜~ 특별한 스페셜 메뉴처럼 특별해요!",
+        "meaningful": "미닝풀~ 미이닝(뜻)이 가득한 풀 통조림!",
+        "a large amount of": "어 라지 어마운트 오브~ 라지 사이즈로 엄청 많은 양!",
+        "wonder": "원더~ 원더우먼처럼 궁금해서 놀란 표정!",
+        "beautiful": "뷰티풀~ 뷰티(아름다움)가 풀로 가득 찼어요!",
+        "vast": "베스트~ 아니 배스트! 아주 넓은 벌판이에요!"
+      },
+      "story": ""
+    },
+    {
       "id": "1788748928589-a5zu",
       "at": 1788748928589,
       "words": [
