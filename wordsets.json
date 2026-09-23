@@ -1,6 +1,338 @@
 {
   "sets": [
     {
+      "id": "1790165035655-9933",
+      "at": 1790165035655,
+      "words": [
+        {
+          "word": "deal with",
+          "meaning": "다루다",
+          "chunks": [
+            "deal",
+            "with"
+          ]
+        },
+        {
+          "word": "since",
+          "meaning": "~이래 줄곧",
+          "chunks": [
+            "since"
+          ]
+        },
+        {
+          "word": "acne",
+          "meaning": "여드름",
+          "chunks": [
+            "ac",
+            "ne"
+          ]
+        },
+        {
+          "word": "emit",
+          "meaning": "내뿜다, 내다",
+          "chunks": [
+            "e",
+            "mit"
+          ]
+        },
+        {
+          "word": "deeply",
+          "meaning": "깊게",
+          "chunks": [
+            "deep",
+            "ly"
+          ]
+        },
+        {
+          "word": "shame",
+          "meaning": "수치심, 부끄러움",
+          "chunks": [
+            "shame"
+          ]
+        },
+        {
+          "word": "still",
+          "meaning": "조용한, 고요한, 가만히 있는",
+          "chunks": [
+            "still"
+          ]
+        },
+        {
+          "word": "clue",
+          "meaning": "단서",
+          "chunks": [
+            "clue"
+          ]
+        },
+        {
+          "word": "head",
+          "meaning": "~로 향하다",
+          "chunks": [
+            "head"
+          ]
+        },
+        {
+          "word": "odd",
+          "meaning": "이상한",
+          "chunks": [
+            "odd"
+          ]
+        },
+        {
+          "word": "freeze",
+          "meaning": "몸이 얼어붙다",
+          "chunks": [
+            "freeze"
+          ]
+        },
+        {
+          "word": "injure",
+          "meaning": "다치게 하다",
+          "chunks": [
+            "in",
+            "jure"
+          ]
+        },
+        {
+          "word": "threat",
+          "meaning": "위협",
+          "chunks": [
+            "threat"
+          ]
+        },
+        {
+          "word": "windshield",
+          "meaning": "바람막이 유리",
+          "chunks": [
+            "wind",
+            "shield"
+          ]
+        },
+        {
+          "word": "on board",
+          "meaning": "탑승한, 승선한",
+          "chunks": [
+            "on",
+            "board"
+          ]
+        },
+        {
+          "word": "aviation",
+          "meaning": "비행, 항공",
+          "chunks": [
+            "avi",
+            "a",
+            "tion"
+          ]
+        },
+        {
+          "word": "road sign",
+          "meaning": "도로 표지판",
+          "chunks": [
+            "road",
+            "sign"
+          ]
+        },
+        {
+          "word": "be aware of",
+          "meaning": "~을 알다, 알아차리다",
+          "chunks": [
+            "be",
+            "aware",
+            "of"
+          ]
+        },
+        {
+          "word": "protect",
+          "meaning": "보호하다",
+          "chunks": [
+            "pro",
+            "tect"
+          ]
+        },
+        {
+          "word": "enough",
+          "meaning": "충분한",
+          "chunks": [
+            "enough"
+          ]
+        },
+        {
+          "word": "warning",
+          "meaning": "경고의",
+          "chunks": [
+            "warn",
+            "ing"
+          ]
+        },
+        {
+          "word": "deer",
+          "meaning": "사슴",
+          "chunks": [
+            "deer"
+          ]
+        },
+        {
+          "word": "cross",
+          "meaning": "가로지르다, 건너다",
+          "chunks": [
+            "cross"
+          ]
+        },
+        {
+          "word": "accident",
+          "meaning": "사고",
+          "chunks": [
+            "acci",
+            "dent"
+          ]
+        },
+        {
+          "word": "happen",
+          "meaning": "일어나다, 발생하다",
+          "chunks": [
+            "hap",
+            "pen"
+          ]
+        },
+        {
+          "word": "serious",
+          "meaning": "심각한",
+          "chunks": [
+            "se",
+            "ri",
+            "ous"
+          ]
+        },
+        {
+          "word": "harm",
+          "meaning": "해치다",
+          "chunks": [
+            "harm"
+          ]
+        },
+        {
+          "word": "damage",
+          "meaning": "손상을 주다, 피해를 입히다",
+          "chunks": [
+            "dam",
+            "age"
+          ]
+        },
+        {
+          "word": "common",
+          "meaning": "흔한",
+          "chunks": [
+            "com",
+            "mon"
+          ]
+        },
+        {
+          "word": "cause",
+          "meaning": "~을 야기하다[초래하다]",
+          "chunks": [
+            "cause"
+          ]
+        }
+      ],
+      "phonics": [
+        {
+          "pattern": "ee",
+          "letters": [
+            "ee"
+          ],
+          "sound": "이",
+          "tip": "ee는 길게 '이~' 소리가 나는 모음이야.",
+          "words": [
+            "deeply",
+            "freeze",
+            "deer"
+          ]
+        },
+        {
+          "pattern": "ea",
+          "letters": [
+            "ea"
+          ],
+          "sound": "에",
+          "tip": "ea가 짧게 '에' 소리를 낼 때가 있어.",
+          "words": [
+            "head",
+            "threat"
+          ]
+        },
+        {
+          "pattern": "sh",
+          "letters": [
+            "sh"
+          ],
+          "sound": "쉬",
+          "tip": "s와 h가 만나면 조용히 하라는 듯 '쉬' 소리가 나.",
+          "words": [
+            "shame",
+            "windshield"
+          ]
+        },
+        {
+          "pattern": "ar",
+          "letters": [
+            "ar"
+          ],
+          "sound": "아r",
+          "tip": "ar은 입을 크게 벌려 '아r' 하고 굴리듯 소리내.",
+          "words": [
+            "warning",
+            "harm"
+          ]
+        },
+        {
+          "pattern": "oa",
+          "letters": [
+            "oa"
+          ],
+          "sound": "오",
+          "tip": "oa는 길게 '오~' 하고 소리내는 모음 콤비야.",
+          "words": [
+            "road sign",
+            "on board"
+          ]
+        }
+      ],
+      "mnemonics": {
+        "deal with": "딜 위드! 문제랑 딜(거래)해서 위드(함께) 해결해!",
+        "since": "신스! 그때부터 신났었으니까 계속 신스~",
+        "acne": "액네! 얼굴에 액체같은 뾰루지, 여드름 액네!",
+        "emit": "이밑! 밑에서 냄새가 이밑으로 뿜어져나와",
+        "deeply": "디플리! 딥다이빙하듯 딥게 깊이 생각해",
+        "shame": "쉐임! 부끄러워서 얼굴이 쉐엠 붉어져",
+        "still": "스틸! 아직도 철(스틸)처럼 그대로 서있어",
+        "clue": "클루! 클루(단서) 찾아 탐정처럼 클루클루",
+        "head": "헤드! 머리에 헤드폰 쓰면 헤드가 시원해",
+        "odd": "오드! 홀수는 오드, 짝이 안맞아 오드해",
+        "freeze": "프리즈! 얼음처럼 프리즈~ 얼어붙었다",
+        "injure": "인저! 다쳐서 인저(인상)쓰며 아파해",
+        "threat": "쓰뤳! 위협하는 소리가 쓰뤳쓰뤳 무서워",
+        "windshield": "윈드쉴드! 바람(윈드) 막는 쉴드(방패) 앞유리",
+        "on board": "온보드! 배에 온몸으로 보드타고 탑승!",
+        "aviation": "에이비에이션! 비행기가 에이비 날아 에이션",
+        "road sign": "로드 사인! 길에서 로드가 사인(신호) 보내",
+        "be aware of": "비 어웨어 오브! 어! 웨어(어디)있는지 알아채!",
+        "protect": "프로텍트! 프로처럼 텍(방패) 들고 지켜줘",
+        "enough": "이너프! 이제 너 충분히 이너프 먹었어",
+        "warning": "워닝! 워어어닝~ 경고음이 울려퍼져",
+        "deer": "디어! 디어(사슴)가 숲에서 디어디어 뛰어놀아",
+        "cross": "크로스! 길을 크로스(교차)해서 건너가",
+        "accident": "액시던트! 액! 순간에 던져진 사고",
+        "happen": "해픈! 무슨일이 해픈(발생)했어? 놀랐잖아",
+        "serious": "시리어스! 시리어스하게 진지한 얼굴표정",
+        "harm": "함! 함부로 하면 함(해)이 생겨",
+        "damage": "데미지! 게임에서 데미지 입듯 손상됐어",
+        "common": "카먼! 다들 카먼(흔한) 일이라 카먼카먼",
+        "cause": "커즈! 왜냐면(커즈) 원인이 있었던거지"
+      },
+      "story": ""
+    },
+    {
       "id": "1789996035506-btt6",
       "at": 1789996035506,
       "words": [
