@@ -1,6 +1,162 @@
 {
   "sets": [
     {
+      "id": "1791640692805-js65",
+      "at": 1791640692805,
+      "words": [
+        {
+          "word": "because",
+          "meaning": "~때문에",
+          "chunks": [
+            "be",
+            "cause"
+          ]
+        },
+        {
+          "word": "east",
+          "meaning": "동쪽",
+          "chunks": [
+            "east"
+          ]
+        },
+        {
+          "word": "expensive",
+          "meaning": "비싼",
+          "chunks": [
+            "ex",
+            "pen",
+            "sive"
+          ]
+        },
+        {
+          "word": "flower",
+          "meaning": "꽃",
+          "chunks": [
+            "flow",
+            "er"
+          ]
+        },
+        {
+          "word": "garden",
+          "meaning": "정원",
+          "chunks": [
+            "gar",
+            "den"
+          ]
+        },
+        {
+          "word": "holiday",
+          "meaning": "휴일",
+          "chunks": [
+            "holi",
+            "day"
+          ]
+        },
+        {
+          "word": "many",
+          "meaning": "많은",
+          "chunks": [
+            "man",
+            "y"
+          ]
+        },
+        {
+          "word": "million",
+          "meaning": "백만",
+          "chunks": [
+            "mil",
+            "lion"
+          ]
+        },
+        {
+          "word": "mountain",
+          "meaning": "산",
+          "chunks": [
+            "moun",
+            "tain"
+          ]
+        },
+        {
+          "word": "place",
+          "meaning": "장소",
+          "chunks": [
+            "place"
+          ]
+        }
+      ],
+      "phonics": [
+        {
+          "pattern": "ow/ou",
+          "letters": [
+            "ow",
+            "ou"
+          ],
+          "sound": "아우",
+          "tip": "ow와 ou는 입을 크게 벌려 '아우~'하고 소리내요.",
+          "words": [
+            "flower",
+            "mountain"
+          ]
+        },
+        {
+          "pattern": "ce",
+          "letters": [
+            "ce"
+          ],
+          "sound": "스",
+          "tip": "ce는 입술을 붙이지 않고 바람처럼 '스'하고 소리내요.",
+          "words": [
+            "place"
+          ]
+        },
+        {
+          "pattern": "y",
+          "letters": [],
+          "sound": "이",
+          "tip": "단어 끝에 오는 y는 짧게 '이'하고 소리나요.",
+          "words": [
+            "many",
+            "holiday"
+          ]
+        },
+        {
+          "pattern": "ea",
+          "letters": [
+            "ea"
+          ],
+          "sound": "이",
+          "tip": "ea는 길게 '이~'하고 늘여서 소리내요.",
+          "words": [
+            "east"
+          ]
+        },
+        {
+          "pattern": "ar",
+          "letters": [
+            "ar"
+          ],
+          "sound": "알",
+          "tip": "ar은 혀를 안쪽으로 말아서 '알~'하고 소리내요.",
+          "words": [
+            "garden"
+          ]
+        }
+      ],
+      "mnemonics": {
+        "because": "비코즈! 이유를 비커에 담아서 콸콸 설명해주는 느낌!",
+        "east": "이스트! 해가 뜨는 동쪽, 빵 반죽처럼 쑤욱 떠올라요!",
+        "expensive": "익스펜시브! 너무 비싸서 지갑이 익어서 터질 지경!",
+        "flower": "플라워! 꽃이 활짝 피어 '플라워~'하고 활짝 웃어요!",
+        "garden": "가든! 정원에서 가든파티 열고 채소를 키워요!",
+        "holiday": "할러데이! 쉬는 날엔 할 일 없이 늘어져요!",
+        "many": "매니! 많은 친구들이 매니저처럼 줄줄이 서있어요!",
+        "million": "밀리언! 백만 개의 밀알이 산더미처럼 쌓였어요!",
+        "mountain": "마운튼! 산 위에서 마우스가 튼튼하게 뛰어다녀요!",
+        "place": "플레이스! 신나게 플레이할 멋진 장소예요!"
+      },
+      "story": ""
+    },
+    {
       "id": "1790165035655-9933",
       "at": 1790165035655,
       "words": [
