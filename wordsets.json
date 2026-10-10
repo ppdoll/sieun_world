@@ -1,6 +1,158 @@
 {
   "sets": [
     {
+      "id": "1791642502084-io6c",
+      "at": 1791642502084,
+      "words": [
+        {
+          "word": "because",
+          "meaning": "Because introduces a reason for something.",
+          "chunks": [
+            "be",
+            "cause"
+          ],
+          "example": "We need to study because we have a test tomorrow.",
+          "keys": [
+            "introduces",
+            "reason"
+          ],
+          "ko": "~때문에"
+        },
+        {
+          "word": "east",
+          "meaning": "East is the direction the sun rises from.",
+          "chunks": [
+            "east"
+          ],
+          "example": "My window looks to the east, so I can watch the sunrise every morning.",
+          "keys": [
+            "direction",
+            "sun rises"
+          ],
+          "ko": "동쪽"
+        },
+        {
+          "word": "expensive",
+          "meaning": "Expensive things cost a lot of money.",
+          "chunks": [
+            "ex",
+            "pen",
+            "sive"
+          ],
+          "example": "My friend drives an expensive sports car.",
+          "keys": [
+            "cost",
+            "a lot of money"
+          ],
+          "ko": "비싼"
+        },
+        {
+          "word": "flower",
+          "meaning": "A flower is the colored part of a plant.",
+          "chunks": [
+            "flow",
+            "er"
+          ],
+          "example": "She gave pink flowers to her grandmother.",
+          "keys": [
+            "colored",
+            "part",
+            "plant"
+          ],
+          "ko": "꽃"
+        },
+        {
+          "word": "garden",
+          "meaning": "A garden is an area where people grow plants.",
+          "chunks": [
+            "gar",
+            "den"
+          ],
+          "example": "The garden is very bright and colorful in the spring.",
+          "keys": [
+            "area",
+            "grow",
+            "plants"
+          ],
+          "ko": "정원"
+        },
+        {
+          "word": "holiday",
+          "meaning": "A holiday is a special day of celebration.",
+          "chunks": [
+            "ho",
+            "li",
+            "day"
+          ],
+          "example": "Monday was a holiday, so there was no school or work.",
+          "keys": [
+            "special day",
+            "celebration"
+          ],
+          "ko": "휴일"
+        },
+        {
+          "word": "many",
+          "meaning": "Many shows that there is a large number of something.",
+          "chunks": [
+            "man",
+            "y"
+          ],
+          "example": "There are many people on the street.",
+          "keys": [
+            "large number"
+          ],
+          "ko": "많은"
+        },
+        {
+          "word": "million",
+          "meaning": "A million is another way to write the number 1,000,000.",
+          "chunks": [
+            "mil",
+            "lion"
+          ],
+          "example": "Almost 19 million people live in Delhi, India.",
+          "keys": [
+            "write",
+            "number",
+            "1000000"
+          ],
+          "ko": "백만"
+        },
+        {
+          "word": "mountain",
+          "meaning": "A mountain is a very high hill.",
+          "chunks": [
+            "moun",
+            "tain"
+          ],
+          "example": "Mount Everest is the highest mountain in the world.",
+          "keys": [
+            "very high",
+            "hill"
+          ],
+          "ko": "산"
+        },
+        {
+          "word": "place",
+          "meaning": "A place is a space or area.",
+          "chunks": [
+            "place"
+          ],
+          "example": "A library is a place where people can read books.",
+          "keys": [
+            "space",
+            "area"
+          ],
+          "ko": "장소"
+        }
+      ],
+      "phonics": [],
+      "mnemonics": {},
+      "story": "",
+      "meaningLang": "en"
+    },
+    {
       "id": "1791640692805-js65",
       "at": 1791640692805,
       "words": [
