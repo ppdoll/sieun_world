@@ -382,3 +382,24 @@ test('translate: 비밀번호 검사와 모델 오류 문구', async () => {
     console.error = origError;
   }
 });
+
+test('extract: lang=en 이면 영영으로 읽고, 없으면 한글 뜻으로 읽는다', async () => {
+  const seen = [];
+  const callModel = async (req) => {
+    seen.push(req);
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ words: [{ word: 'place', meaning: 'A place is a space or area.', example: '', keys: ['space'], ko: '장소', chunks: ['place'] }] }) }],
+      stop_reason: 'end_turn',
+    };
+  };
+  const handler = makeExtractHandler({ callModel });
+  let res = mockRes();
+  await handler(mockReq({ body: { image: IMAGE, lang: 'en' } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.match(seen[0].content[1].text, /영영/);
+  assert.deepEqual(res.body.words[0].keys, ['space']);
+
+  res = mockRes();
+  await handler(mockReq({ body: { image: IMAGE, lang: 'weird' } }), res);
+  assert.doesNotMatch(seen[1].content[1].text, /영영/, '모르는 값은 한글 뜻으로');
+});

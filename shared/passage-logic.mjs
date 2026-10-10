@@ -2,7 +2,7 @@
 // 독해 지문과 문제의 순수 로직. 모델을 직접 호출하지 않는다.
 // 프롬프트 생성, 응답 해석, 그리고 무엇보다 "근거 문장이 지문에 실제로 있는가" 검증.
 
-import { extractJson } from './wordlab-logic.mjs';
+import { extractJson, wordForms } from './wordlab-logic.mjs';
 import { messageText } from './extract-logic.mjs';
 
 export const MAX_PASSAGE_CHARS = 4000;
@@ -349,21 +349,9 @@ export function buildWordIndex(sets) {
   return map;
 }
 
-/**
- * 표제어의 흔한 변화형. 지문은 creatures, reefs, recognized 처럼 쓰는데
- * 단어장에는 원형만 있어서 그냥 맞추면 거의 안 걸린다.
- */
-export function wordForms(word) {
-  const k = String(word ?? '').toLowerCase().trim();
-  if (!/[a-z]$/.test(k)) return k ? [k] : [];
-  const out = [k, k + 's', k + 'es', k + 'ed', k + 'ing', k + 'ly'];
-  if (k.endsWith('e')) {
-    const stem = k.slice(0, -1);
-    out.push(k + 'd', stem + 'ing');
-  }
-  if (k.endsWith('y')) out.push(k.slice(0, -1) + 'ies', k.slice(0, -1) + 'ied');
-  return [...new Set(out)];
-}
+// 표제어의 흔한 변화형(wordForms)은 영영 풀이 채점도 함께 써서 shared/wordlab-logic.mjs 로 옮겼다.
+// 지문은 creatures, reefs 처럼 쓰는데 단어장에는 원형만 있어서, 아는 단어를 잡을 때 쓴다
+export { wordForms };
 
 /**
  * 문장을 조각으로 나눈다. 아는 단어는 뜻을 달아 표시한다.

@@ -7,6 +7,8 @@
 import {
   WORDS_SCHEMA,
   WORDS_SYSTEM,
+  WORDS_EN_SCHEMA,
+  WORDS_EN_SYSTEM,
   PHONICS_SCHEMA,
   PHONICS_SYSTEM,
   STORY_SCHEMA,
@@ -20,13 +22,14 @@ import {
   mergeWords,
 } from './extract-logic.mjs';
 
-function imageRequest(image, region) {
+function imageRequest(image, region, lang) {
+  const en = lang === 'en';
   return {
-    system: WORDS_SYSTEM,
-    schema: WORDS_SCHEMA,
+    system: en ? WORDS_EN_SYSTEM : WORDS_SYSTEM,
+    schema: en ? WORDS_EN_SCHEMA : WORDS_SCHEMA,
     content: [
       { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } },
-      { type: 'text', text: wordsPrompt(region) },
+      { type: 'text', text: wordsPrompt(region, en ? 'en' : 'ko') },
     ],
   };
 }
@@ -40,11 +43,11 @@ function imageRequest(image, region) {
  *
  * @returns {{ status: 'ok'|'truncated'|'refused'|'unparsable', words: Array, split: boolean, calls: number }}
  */
-export async function extractWordsFromImage({ image, callModel }) {
+export async function extractWordsFromImage({ image, callModel, lang = 'ko' }) {
   let calls = 0;
   const ask = async (region) => {
     calls++;
-    return parseWordsResponse(await callModel(imageRequest(image, region)));
+    return parseWordsResponse(await callModel(imageRequest(image, region, lang)), lang);
   };
 
   const first = await ask('all');

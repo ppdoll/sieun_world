@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { buildQuiz, gradeAnswer, summarize, collectWrong, sanitizeWords } from '../shared/wordlab-logic.mjs';
+import {
+  buildQuiz,
+  gradeAnswer,
+  summarize,
+  collectWrong,
+  sanitizeWords,
+  blankWord,
+  markKeys,
+} from '../shared/wordlab-logic.mjs';
+import { sanitizeDefinitionWords, sanitizeKeys, detectMeaningLang, normLang } from '../shared/definition-logic.mjs';
 import { flagWords, normalizeLetters, highlightChunks, sanitizePhonics, splitStory } from '../shared/extract-logic.mjs';
 import { buildAssembly, gradeAssembly } from '../shared/assembly.mjs';
 import { parseWordLines } from '../shared/manual-entry.mjs';
@@ -16,7 +25,7 @@ import {
   pushRemoteSet,
   deleteRemoteSet,
 } from './api.js';
-import { loadWordSets, saveWordSets } from './storage.js';
+import { loadWordSets, saveWordSets, loadPickLang, savePickLang } from './storage.js';
 import {
   MAX_WORDSETS,
   makeWordSet,
@@ -29,13 +38,15 @@ import {
   markStudied,
   combineWordSets,
   sortByActivity,
+  commonLang,
+  setLang as langOfSet,
 } from '../shared/wordsets.mjs';
 
 /* ────────────────────────────────────────────────────────────
    1. 사진 올리기
    ──────────────────────────────────────────────────────────── */
 
-function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove, onCombine }) {
+function Upload({ lang, onLang, onExtracted, onManual, sets, syncNote, onResume, onRemove, onCombine }) {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -48,6 +59,8 @@ function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove, onC
 
   const chosenSets = sets.filter((s) => chosen.includes(s.id));
   const chosenWordCount = combineWordSets(chosenSets).words.length;
+  // 한글 뜻과 영어 풀이는 시험 유형이 달라 한 문제지로 묶을 수 없다
+  const chosenMixed = commonLang(chosenSets) === 'mixed';
   function toggleChosen(id) {
     setChosen((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   }
@@ -65,14 +78,14 @@ function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove, onC
       for (let i = 0; i < files.length; i++) {
         setNote(files.length + '장 중 ' + (i + 1) + '번째 사진을 읽는 중');
         const image = await prepareImage(files[i]);
-        const got = await extractFromImage(image);
+        const got = await extractFromImage(image, lang);
         all.push(...got.words);
         if (got.status === 'truncated') cut = true;
       }
       const merged = sanitizeWords(all, { keepEmptyMeaning: true });
       if (merged.length === 0) throw new Error('단어를 찾지 못했어요. 글자가 잘 보이게 다시 찍어주세요.');
       setNeedPasscode(false);
-      onExtracted(merged, cut);
+      onExtracted(merged, cut, lang);
     } catch (e) {
       if (e.needPasscode) setNeedPasscode(true);
       setErr(e.message || '잘 되지 않았어요. 한 번 더 눌러주세요.');
@@ -90,6 +103,29 @@ function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove, onC
         오늘 공부가 만들어져요
       </h1>
       <p className="wl-sub">사진에서 단어와 뜻을 읽어내고, 공통 파닉스 규칙 다섯 개를 뽑아 시험까지 이어집니다.</p>
+
+      <div className="wl-seg" role="radiogroup" aria-label="단어장 종류">
+        <button
+          className={'wl-seg-b' + (lang === 'ko' ? ' on' : '')}
+          role="radio"
+          aria-checked={lang === 'ko'}
+          disabled={busy}
+          onClick={() => onLang('ko')}
+        >
+          <span className="wl-seg-t">한글 뜻</span>
+          <span className="wl-seg-s">creature · 생명체</span>
+        </button>
+        <button
+          className={'wl-seg-b' + (lang === 'en' ? ' on' : '')}
+          role="radio"
+          aria-checked={lang === 'en'}
+          disabled={busy}
+          onClick={() => onLang('en')}
+        >
+          <span className="wl-seg-t">영어 풀이</span>
+          <span className="wl-seg-s">place · a space or area</span>
+        </button>
+      </div>
 
       <div className="wl-drop" onClick={() => !busy && inputRef.current?.click()}>
         <div className="wl-drop-ico">📷</div>
@@ -184,7 +220,10 @@ function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove, onC
                 >
                   {selecting && <span className={'wl-set-check' + (picked ? ' on' : '')}>{picked ? '✓' : ''}</span>}
                   <span className="wl-set-text">
-                    <span className="wl-set-t">{wordSetTitle(s)}</span>
+                    <span className="wl-set-t">
+                      {langOfSet(s) === 'en' && <span className="wl-tag">영어 풀이</span>}
+                      {wordSetTitle(s)}
+                    </span>
                     <span className="wl-set-s">
                       {s.words.length}개 단어{selecting ? '' : ' · 이어서 하기'}
                       {s.lastStudiedAt ? ' · 이 기기에서 공부함' : ''}
@@ -200,6 +239,9 @@ function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove, onC
               </div>
             );
           })}
+          {selecting && chosenMixed && (
+            <div className="wl-warn">한글 뜻 단어장과 영어 풀이 단어장은 시험 모양이 달라요. 같은 종류끼리 골라주세요.</div>
+          )}
           {selecting && (
             <div className="wl-row">
               <button className="wl-ghost" onClick={stopSelecting}>
@@ -207,7 +249,7 @@ function Upload({ onExtracted, onManual, sets, syncNote, onResume, onRemove, onC
               </button>
               <button
                 className="wl-cta wl-inline"
-                disabled={chosen.length === 0}
+                disabled={chosen.length === 0 || chosenMixed}
                 onClick={() => {
                   onCombine(chosen);
                   stopSelecting();
@@ -236,22 +278,41 @@ const FLAG_LABEL = {
   'chunk-fallback': '덩어리가 나뉘지 않았어요',
 };
 
+const splitKeys = (text) =>
+  String(text ?? '')
+    .split(/[,;]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
 function rowToWord(r) {
   const word = r.word.trim();
   const chunks = r.chunksText
     .split(/[-·/|,]/)
     .map((s) => s.trim())
     .filter(Boolean);
-  return { word, meaning: r.meaning.trim(), chunks: chunks.length ? chunks : [word] };
+  const out = { word, meaning: r.meaning.trim(), chunks: chunks.length ? chunks : [word] };
+  // 영어 풀이 단어장의 칸. 있을 때만 붙인다
+  if (r.example?.trim()) out.example = r.example.trim();
+  const keys = splitKeys(r.keysText);
+  if (keys.length) out.keys = keys;
+  if (r.ko?.trim()) out.ko = r.ko.trim();
+  return out;
 }
 
-const blankRow = () => ({ word: '', meaning: '', chunksText: '' });
+const blankRow = () => ({ word: '', meaning: '', chunksText: '', example: '', keysText: '', ko: '' });
 const isBlankRow = (r) => !r.word.trim() && !r.meaning.trim() && !r.chunksText.trim();
+const wordToRow = (w) => ({
+  word: w.word,
+  meaning: w.meaning,
+  chunksText: w.chunks.join('-'),
+  example: w.example ?? '',
+  keysText: (w.keys ?? []).join(', '),
+  ko: w.ko ?? '',
+});
 
-function Review({ words, truncated, manual, onConfirm, onBack }) {
-  const [rows, setRows] = useState(() =>
-    manual ? [blankRow()] : words.map((w) => ({ word: w.word, meaning: w.meaning, chunksText: w.chunks.join('-') }))
-  );
+function Review({ words, truncated, manual, lang = 'ko', onConfirm, onBack }) {
+  const en = lang === 'en';
+  const [rows, setRows] = useState(() => (manual ? [blankRow()] : words.map(wordToRow)));
   const [err, setErr] = useState('');
   const [paste, setPaste] = useState('');
   const [pasteOpen, setPasteOpen] = useState(!!manual);
@@ -263,6 +324,9 @@ function Review({ words, truncated, manual, onConfirm, onBack }) {
   });
   const liveCount = rows.filter((r) => !isBlankRow(r)).length;
   const flaggedCount = flags.filter((f) => f.length).length;
+  // 고른 종류와 읽힌 뜻이 다르면 알려준다 (영어 풀이 책을 "한글 뜻" 으로 읽었을 때 등)
+  const liveWords = rows.filter((r) => !isBlankRow(r) && r.meaning.trim()).map(rowToWord);
+  const seenLang = liveWords.length >= 2 ? detectMeaningLang(liveWords) : lang;
 
   function update(i, key, value) {
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [key]: value } : r)));
@@ -277,13 +341,14 @@ function Review({ words, truncated, manual, onConfirm, onBack }) {
   function applyPaste() {
     const parsed = parseWordLines(paste);
     if (parsed.length === 0) {
-      setErr('읽을 수 있는 줄이 없어요. 한 줄에 "creature 생명체"처럼 영어 단어와 뜻을 적어주세요.');
+      setErr(
+        en
+          ? '읽을 수 있는 줄이 없어요. 한 줄에 "place: A place is a space or area." 처럼 단어와 풀이 사이에 : 를 넣어주세요.'
+          : '읽을 수 있는 줄이 없어요. 한 줄에 "creature 생명체"처럼 영어 단어와 뜻을 적어주세요.'
+      );
       return;
     }
-    setRows((rs) => [
-      ...rs.filter((r) => !isBlankRow(r)),
-      ...parsed.map((p) => ({ word: p.word, meaning: p.meaning, chunksText: p.chunks.join('-') })),
-    ]);
+    setRows((rs) => [...rs.filter((r) => !isBlankRow(r)), ...parsed.map((p) => wordToRow({ ...p, keys: [] }))]);
     setPaste('');
     setPasteOpen(false);
     setErr('');
@@ -295,7 +360,9 @@ function Review({ words, truncated, manual, onConfirm, onBack }) {
       setErr('빈 칸이 ' + blanks + '줄 있어요. 채우거나 그 줄을 지워주세요.');
       return;
     }
-    const clean = sanitizeWords(live.map(rowToWord));
+    let clean = sanitizeWords(live.map(rowToWord));
+    // 영어 풀이는 품사 표시를 떼고, 핵심 낱말이 풀이에 실제로 있는지 다시 맞춘다
+    if (en) clean = sanitizeDefinitionWords(clean);
     if (clean.length === 0) {
       setErr('단어가 하나도 없어요. 단어와 뜻을 채워주세요.');
       return;
@@ -309,9 +376,21 @@ function Review({ words, truncated, manual, onConfirm, onBack }) {
       <h2 className="wl-h2">{manual ? '단어를 직접 넣어주세요' : '뽑은 단어 ' + liveCount + '개를 확인해 주세요'}</h2>
       <p className="wl-sub">
         {manual
-          ? '표에 바로 적거나, 아래에 여러 줄을 붙여 넣어요. 덩어리는 -로 나눠 적어요 (crea-ture).'
-          : '틀린 뜻을 그대로 두면 아이가 틀린 답을 외워요. 칸을 눌러 바로 고칠 수 있어요. 덩어리는 -로 나눠 적어요.'}
+          ? en
+            ? '아래에 적거나 여러 줄을 붙여 넣어요. 한 줄에 "place: A place is a space or area." 처럼 써요.'
+            : '표에 바로 적거나, 아래에 여러 줄을 붙여 넣어요. 덩어리는 -로 나눠 적어요 (crea-ture).'
+          : en
+            ? '풀이가 책과 같은지 봐주세요. 핵심 낱말이 다 들어가면 풀이 쓰기를 맞은 걸로 쳐요.'
+            : '틀린 뜻을 그대로 두면 아이가 틀린 답을 외워요. 칸을 눌러 바로 고칠 수 있어요. 덩어리는 -로 나눠 적어요.'}
       </p>
+
+      {!manual && seenLang !== lang && (
+        <div className="wl-warn">
+          {lang === 'en'
+            ? '뜻이 한글로 읽혔어요. 한글 뜻 단어장이면 처음으로 돌아가 "한글 뜻" 을 골라주세요.'
+            : '뜻이 영어로 읽혔어요. 영어 풀이 단어장이면 처음으로 돌아가 "영어 풀이" 를 골라주세요.'}
+        </div>
+      )}
 
       {pasteOpen ? (
         <div className="wl-pastebox">
@@ -319,7 +398,11 @@ function Review({ words, truncated, manual, onConfirm, onBack }) {
             className="wl-paste"
             rows={6}
             value={paste}
-            placeholder={'한 줄에 하나씩\ncrea-ture 생명체\nmantis shrimp 갯가재\nbright-ly 밝게, 선명하게'}
+            placeholder={
+              en
+                ? '한 줄에 하나씩\nbe-cause: Because introduces a reason for something.\nplace: A place is a space or area.'
+                : '한 줄에 하나씩\ncrea-ture 생명체\nmantis shrimp 갯가재\nbright-ly 밝게, 선명하게'
+            }
             onChange={(e) => setPaste(e.target.value)}
             autoCapitalize="none"
             autoCorrect="off"
@@ -346,7 +429,69 @@ function Review({ words, truncated, manual, onConfirm, onBack }) {
         <div className="wl-warn">노란 줄 {flaggedCount}개는 한 번 더 봐주세요.</div>
       )}
 
-      <div className="wl-tablewrap">
+      {en && (
+        <div className="wl-dcards">
+          {rows.map((r, i) => {
+            const keysUsed = r.meaning.trim() ? sanitizeKeys(splitKeys(r.keysText), r.meaning, r.word) : [];
+            return (
+              <div className={'wl-dcard' + (flags[i].length ? ' flagged' : '')} key={i}>
+                <div className="wl-dcard-top">
+                  <input
+                    className="wl-cell wl-dcard-word"
+                    value={r.word}
+                    placeholder="단어"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    onChange={(e) => update(i, 'word', e.target.value)}
+                  />
+                  <input
+                    className="wl-cell wl-cell-chunks"
+                    value={r.chunksText}
+                    placeholder="덩어리 be-cause"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    onChange={(e) => update(i, 'chunksText', e.target.value)}
+                  />
+                  <button className="wl-x" onClick={() => remove(i)} aria-label="이 단어 지우기">
+                    ×
+                  </button>
+                </div>
+                <label className="wl-dlabel">풀이</label>
+                <textarea
+                  className="wl-cell wl-dcard-def"
+                  rows={2}
+                  value={r.meaning}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  onChange={(e) => update(i, 'meaning', e.target.value)}
+                />
+                <label className="wl-dlabel">핵심 낱말 · 쉼표로 나눠요</label>
+                <input
+                  className="wl-cell"
+                  value={r.keysText}
+                  placeholder="비우면 풀이에서 골라요"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={(e) => update(i, 'keysText', e.target.value)}
+                />
+                {keysUsed.length > 0 && <div className="wl-dkeys">채점에 쓸 낱말: {keysUsed.join(', ')}</div>}
+                <div className="wl-dcard-mini">
+                  <label className="wl-dlabel">예문</label>
+                  <input className="wl-cell" value={r.example} spellCheck={false} onChange={(e) => update(i, 'example', e.target.value)} />
+                  <label className="wl-dlabel">한국어 뜻 · 도움용</label>
+                  <input className="wl-cell" value={r.ko} onChange={(e) => update(i, 'ko', e.target.value)} />
+                </div>
+                {flags[i].length > 0 && <div className="wl-flags">{flags[i].map((f) => FLAG_LABEL[f]).join(' · ')}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="wl-tablewrap" hidden={en}>
         <table className="wl-table">
           <thead>
             <tr>
@@ -477,7 +622,7 @@ function Phonics({ phonics: rawPhonics, loading, error, words, onNext, onRefresh
    3. 덩어리 읽기
    ──────────────────────────────────────────────────────────── */
 
-function Chunks({ words, mnemonics, onNext }) {
+function Chunks({ words, mnemonics, lang = 'ko', onNext }) {
   const [i, setI] = useState(0);
   const w = words[i];
   const last = i === words.length - 1;
@@ -499,13 +644,29 @@ function Chunks({ words, mnemonics, onNext }) {
 
       <div className="wl-stage">
         <ChunkWord chunks={w.chunks} onChunk={(c) => speak(c, 0.6)} />
-        <div className="wl-meaning">{w.meaning}</div>
+        {lang === 'en' ? (
+          <div className="wl-defbox">
+            <div className="wl-def">{w.meaning}</div>
+            {w.ko && <div className="wl-def-ko">{w.ko}</div>}
+            {w.example && <div className="wl-def-ex">{w.example}</div>}
+            <div className="wl-row wl-center">
+              <SpeakBtn text={w.meaning} label="풀이 듣기" rate={0.85} />
+              {w.example && <SpeakBtn text={w.example} label="예문 듣기" rate={0.85} />}
+            </div>
+          </div>
+        ) : (
+          <div className="wl-meaning">{w.meaning}</div>
+        )}
         <Mnemonic tip={mnemonics?.[w.word]} />
         <div className="wl-row">
           <SpeakBtn text={w.word} label="듣기" big />
           <SpeakBtn text={w.word} label="천천히" rate={0.5} big />
         </div>
-        <p className="wl-note">덩어리를 하나씩 누르면 그 부분만 들려요. 입으로 따라 말하면서 손으로 써보세요.</p>
+        <p className="wl-note">
+          {lang === 'en'
+            ? '덩어리를 누르면 그 부분만 들려요. 풀이를 소리 내어 읽고, 노트에 풀이까지 써보세요.'
+            : '덩어리를 하나씩 누르면 그 부분만 들려요. 입으로 따라 말하면서 손으로 써보세요.'}
+        </p>
       </div>
 
       <div className="wl-row">
@@ -530,7 +691,7 @@ function Chunks({ words, mnemonics, onNext }) {
    3-2. 덩어리 맞추기 — 섞인 덩어리를 순서대로 눌러 단어를 만든다 (연습, 채점 없음)
    ──────────────────────────────────────────────────────────── */
 
-function Assemble({ words, seed, onNext }) {
+function Assemble({ words, seed, lang = 'ko', onNext }) {
   const [items] = useState(() => buildAssembly(words, { seed }));
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState([]); // 누른 순서대로의 pool 인덱스
@@ -581,7 +742,12 @@ function Assemble({ words, seed, onNext }) {
       <p className="wl-sub">뜻을 보고 덩어리를 순서대로 눌러 단어를 만들어요. 누르면 그 덩어리 소리가 나요.</p>
 
       <div className="wl-stage">
-        <div className="wl-prompt">{item.meaning}</div>
+        {lang === 'en' ? (
+          // 영어 풀이에는 단어가 그대로 들어 있어 가리지 않으면 답이 보인다
+          <div className="wl-prompt wl-prompt-def">{blankWord(item.meaning, item.word)}</div>
+        ) : (
+          <div className="wl-prompt">{item.meaning}</div>
+        )}
 
         <div className="wl-slots" aria-label="만든 단어">
           {item.chunks.map((_, pos) =>
@@ -705,13 +871,36 @@ function Story({ story, loading, error, combined, words, onNext, onRefresh }) {
    4·5·6. 시험 / 오답 / 최종
    ──────────────────────────────────────────────────────────── */
 
-const TYPE_LABEL = { spell: '뜻 보고 쓰기', listen: '듣고 쓰기', meaning: '뜻 고르기' };
+const TYPE_LABEL = { spell: '뜻 보고 쓰기', listen: '듣고 쓰기', meaning: '뜻 고르기', define: '풀이 쓰기' };
+const TYPE_LABEL_EN = { spell: '풀이 보고 단어 쓰기', define: '단어 보고 풀이 쓰기' };
 
-function Quiz({ words, seed, title, subtitle, mnemonics, onDone }) {
+/** 실제 시험 모양: 한글 뜻은 세 유형, 영어 풀이는 학교 시험과 같은 두 방향 */
+function quizTypes(lang) {
+  if (lang === 'en') return ['spell', 'define'];
   // 영어 목소리가 없는 기기에서는 받아쓰기 유형을 뺀다 (README §7)
-  const [quiz] = useState(() =>
-    buildQuiz(words, { seed, types: hasEnglishVoice() ? ['spell', 'listen', 'meaning'] : ['spell', 'meaning'] })
+  return hasEnglishVoice() ? ['spell', 'listen', 'meaning'] : ['spell', 'meaning'];
+}
+
+/** 풀이 쓰기 채점 뒤: 풀이에 쓴 낱말(초록)과 빠진 낱말(노랑)을 표시해 보여준다 */
+function MarkedDefinition({ text, found, missing }) {
+  return (
+    <div className="wl-def wl-def-marked">
+      {markKeys(text, found, missing).map((p, k) =>
+        p.mark ? (
+          <span key={k} className={'wl-key wl-key-' + p.mark}>
+            {p.text}
+          </span>
+        ) : (
+          <span key={k}>{p.text}</span>
+        )
+      )}
+    </div>
   );
+}
+
+function Quiz({ words, seed, title, subtitle, mnemonics, lang = 'ko', onDone }) {
+  const en = lang === 'en';
+  const [quiz] = useState(() => buildQuiz(words, { seed, lang, types: quizTypes(lang) }));
   const [i, setI] = useState(0);
   const [value, setValue] = useState('');
   const [judged, setJudged] = useState(null);
@@ -750,7 +939,7 @@ function Quiz({ words, seed, title, subtitle, mnemonics, onDone }) {
   return (
     <div className="wl-pane">
       <div className="wl-quizhead">
-        <span className="wl-badge">{TYPE_LABEL[q.type]}</span>
+        <span className="wl-badge">{(en && TYPE_LABEL_EN[q.type]) || TYPE_LABEL[q.type]}</span>
         <span className="wl-count">
           {i + 1} / {quiz.length}
         </span>
@@ -762,7 +951,17 @@ function Quiz({ words, seed, title, subtitle, mnemonics, onDone }) {
       {subtitle && <p className="wl-sub">{subtitle}</p>}
 
       <div className="wl-stage">
-        {q.type === 'spell' && <div className="wl-prompt">{q.meaning}</div>}
+        {q.type === 'spell' && !en && <div className="wl-prompt">{q.meaning}</div>}
+        {/* 영어 풀이는 풀이 속 단어를 ___ 로 가린 것이 문제다 */}
+        {q.type === 'spell' && en && <div className="wl-prompt wl-prompt-def">{q.prompt}</div>}
+        {q.type === 'define' && (
+          <>
+            <div className="wl-prompt wl-prompt-en">{q.word}</div>
+            <div className="wl-row wl-center">
+              <SpeakBtn text={q.word} label="듣기" />
+            </div>
+          </>
+        )}
         {q.type === 'meaning' && <div className="wl-prompt wl-prompt-en">{q.word}</div>}
         {q.type === 'listen' && (
           <div className="wl-row wl-center">
@@ -790,20 +989,41 @@ function Quiz({ words, seed, title, subtitle, mnemonics, onDone }) {
           </div>
         ) : (
           <>
-            <input
-              ref={inputRef}
-              className={'wl-input' + (judged ? (judged.correct ? ' ok' : ' no') : '')}
-              value={value}
-              placeholder="영어로 쓰기"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              disabled={!!judged}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') check(value);
-              }}
-            />
+            {q.type === 'define' ? (
+              <textarea
+                ref={inputRef}
+                className={'wl-input wl-input-def' + (judged ? (judged.correct ? ' ok' : ' no') : '')}
+                rows={2}
+                value={value}
+                placeholder="풀이를 영어로 쓰기"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                disabled={!!judged}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    check(value);
+                  }
+                }}
+              />
+            ) : (
+              <input
+                ref={inputRef}
+                className={'wl-input' + (judged ? (judged.correct ? ' ok' : ' no') : '')}
+                value={value}
+                placeholder="영어로 쓰기"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                disabled={!!judged}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') check(value);
+                }}
+              />
+            )}
             {!judged && (
               <div className="wl-row wl-center">
                 <button className="wl-ghost wl-sm" onClick={() => setHintOn(true)}>
@@ -814,10 +1034,23 @@ function Quiz({ words, seed, title, subtitle, mnemonics, onDone }) {
                 </button>
               </div>
             )}
-            {hintOn && !judged && (
+            {hintOn && !judged && q.type === 'define' && (
+              <div className="wl-hint">
+                <span className="wl-hint-def">{q.defHint}</span>
+                {q.ko && <span className="wl-hint-meaning">{q.ko}</span>}
+              </div>
+            )}
+            {hintOn && !judged && q.type !== 'define' && (
               <div className="wl-hint">
                 <span className="wl-hint-mask">{q.hint}</span>
-                <span className="wl-hint-meaning">{q.meaning}</span>
+                {en ? (
+                  <>
+                    {q.exampleBlank && <span className="wl-hint-ex">{q.exampleBlank}</span>}
+                    {q.ko && <span className="wl-hint-meaning">{q.ko}</span>}
+                  </>
+                ) : (
+                  <span className="wl-hint-meaning">{q.meaning}</span>
+                )}
               </div>
             )}
             {!judged && (
@@ -832,10 +1065,29 @@ function Quiz({ words, seed, title, subtitle, mnemonics, onDone }) {
           <div className={'wl-verdict ' + (judged.correct ? 'ok' : 'no')}>
             <div className="wl-verdict-t">{judged.correct ? '맞았어요' : '정답을 볼까요'}</div>
             <ChunkWord chunks={q.chunks} onChunk={(c) => speak(c, 0.6)} />
-            <div className="wl-meaning">{q.meaning}</div>
+            {q.type === 'define' ? (
+              <>
+                <MarkedDefinition text={q.meaning} found={judged.found} missing={judged.missing} />
+                {judged.correct ? (
+                  <p className="wl-note">핵심 낱말을 다 썼어요.</p>
+                ) : judged.found?.length > 0 ? (
+                  <p className="wl-note">
+                    핵심 낱말 {judged.total}개 중 {judged.found.length}개를 썼어요. 노란 낱말만 다시 보면 돼요.
+                  </p>
+                ) : (
+                  <p className="wl-note">노란 낱말이 꼭 들어가야 해요.</p>
+                )}
+              </>
+            ) : en ? (
+              <div className="wl-def">{q.meaning}</div>
+            ) : (
+              <div className="wl-meaning">{q.meaning}</div>
+            )}
+            {en && q.ko && <div className="wl-def-ko">{q.ko}</div>}
             {!judged.correct && judged.matched > 0 && (
               <p className="wl-note">앞의 {judged.matched}글자는 맞았어요. 뒷부분만 다시 보면 돼요.</p>
             )}
+            {en && <SpeakBtn text={q.meaning} label="풀이 듣기" rate={0.85} />}
             <Mnemonic tip={mnemonics?.[q.word]} />
             <button className="wl-cta" onClick={next}>
               {i === quiz.length - 1 ? '결과 보기' : '다음'}
@@ -866,7 +1118,7 @@ function Result({ summary, words, mode, onNext, onRetry }) {
               .map((w) => (
                 <button key={w.word} className="wl-wordpill" onClick={() => speak(w.word)}>
                   <ChunkWord chunks={w.chunks} size="sm" />
-                  <span className="wl-pill-meaning">{w.meaning}</span>
+                  <span className="wl-pill-meaning">{w.ko || w.meaning}</span>
                 </button>
               ))}
           </div>
@@ -911,7 +1163,9 @@ const stepIndex = (key) => STEP_INDEX[key] ?? 0;
 export default function WordLab({ onHome }) {
   const [step, setStep] = useState('upload');
   const [words, setWords] = useState([]);
-  const [pending, setPending] = useState({ words: [], truncated: false, manual: false });
+  const [pending, setPending] = useState({ words: [], truncated: false, manual: false, lang: 'ko' });
+  const [pickLang, setPickLang] = useState(loadPickLang); // 사진 올리기에서 고른 단어장 종류 (기억해 둔다)
+  const [meaningLang, setMeaningLang] = useState('ko'); // 지금 공부하는 단어장의 종류
   const [phonics, setPhonics] = useState([]);
   const [phonicsLoading, setPhonicsLoading] = useState(false);
   const [phonicsError, setPhonicsError] = useState('');
@@ -962,15 +1216,21 @@ export default function WordLab({ onHome }) {
     }
   }
 
-  function onExtracted(w, truncated) {
-    setPending({ words: w, truncated, manual: false });
+  function onExtracted(w, truncated, l) {
+    setPending({ words: w, truncated, manual: false, lang: normLang(l) });
     setStep('check');
   }
 
   /** 사진 없이 표에 직접 적어 단어장을 만든다 */
   function startManual() {
-    setPending({ words: [], truncated: false, manual: true });
+    setPending({ words: [], truncated: false, manual: true, lang: pickLang });
     setStep('check');
+  }
+
+  function choosePickLang(l) {
+    const v = normLang(l);
+    setPickLang(v);
+    savePickLang(v);
   }
 
   /** 단계 번호를 눌러 이동할 수 있는가 */
@@ -1042,9 +1302,12 @@ export default function WordLab({ onHome }) {
 
   /** 검수를 마친 단어장으로 시작. 목록 맨 앞에 저장되고 오래된 것은 밀려난다 */
   function start(w) {
-    const set = makeWordSet(w, []);
+    const l = normLang(pending.lang);
+    // 영어 풀이 단어장일 때만 종류를 적는다. 없으면 예전처럼 한글 뜻으로 본다
+    const set = l === 'en' ? { ...makeWordSet(w, []), meaningLang: 'en' } : makeWordSet(w, []);
     commitSets(addWordSet(setsRef.current, set));
     setCurrentId(set.id);
+    setMeaningLang(l);
     setCombined(0);
     setWords(w);
     setPhonics([]);
@@ -1062,6 +1325,7 @@ export default function WordLab({ onHome }) {
     if (!set) return;
     commitSets(markStudied(setsRef.current, id));
     setCurrentId(id);
+    setMeaningLang(langOfSet(set));
     setCombined(0);
     setWords(set.words);
     setPhonics(set.phonics || []);
@@ -1076,11 +1340,13 @@ export default function WordLab({ onHome }) {
   function combine(ids) {
     const picked = ids.map((id) => findWordSet(setsRef.current, id)).filter(Boolean);
     const c = combineWordSets(picked);
-    if (c.words.length === 0) return;
+    // 한글 뜻과 영어 풀이는 시험 모양이 달라 묶지 않는다 (고르는 화면에서도 막는다)
+    if (c.words.length === 0 || c.meaningLang === 'mixed') return;
     let next = setsRef.current;
     for (const id of ids) next = markStudied(next, id);
     commitSets(next);
     setCurrentId(null);
+    setMeaningLang(c.meaningLang);
     setCombined(c.count);
     setWords(c.words);
     setPhonics(c.phonics);
@@ -1162,6 +1428,8 @@ export default function WordLab({ onHome }) {
 
         {step === 'upload' && (
           <Upload
+            lang={pickLang}
+            onLang={choosePickLang}
             onExtracted={onExtracted}
             onManual={startManual}
             sets={sets}
@@ -1174,10 +1442,11 @@ export default function WordLab({ onHome }) {
 
         {step === 'check' && (
           <Review
-            key={pending.manual ? 'manual' : 'photo'}
+            key={(pending.manual ? 'manual' : 'photo') + pending.lang}
             words={pending.words}
             truncated={pending.truncated}
             manual={pending.manual}
+            lang={pending.lang}
             onConfirm={start}
             onBack={() => setStep('upload')}
           />
@@ -1194,9 +1463,9 @@ export default function WordLab({ onHome }) {
           />
         )}
 
-        {step === 'chunks' && <Chunks words={words} mnemonics={mnemonics} onNext={afterChunks} />}
+        {step === 'chunks' && <Chunks words={words} mnemonics={mnemonics} lang={meaningLang} onNext={afterChunks} />}
 
-        {step === 'assemble' && <Assemble words={words} seed={7} onNext={() => setStep('story')} />}
+        {step === 'assemble' && <Assemble words={words} seed={7} lang={meaningLang} onNext={() => setStep('story')} />}
 
         {step === 'story' && (
           <Story
@@ -1220,6 +1489,7 @@ export default function WordLab({ onHome }) {
               (combined ? '단어장 ' + combined + '개를 묶었어요. ' : '') + '틀려도 괜찮아요. 틀린 것만 따로 모아둘게요.'
             }
             mnemonics={mnemonics}
+            lang={meaningLang}
             onDone={(r) => finishStage(r, 'quiz')}
           />
         )}
@@ -1232,6 +1502,7 @@ export default function WordLab({ onHome }) {
             title="오답 복습"
             subtitle="아까 놓친 것만 모았어요."
             mnemonics={mnemonics}
+            lang={meaningLang}
             onDone={(r) => finishStage(r, 'review')}
           />
         )}
@@ -1244,6 +1515,7 @@ export default function WordLab({ onHome }) {
             title="최종 시험"
             subtitle="전체 단어를 순서 바꿔서 한 번에."
             mnemonics={mnemonics}
+            lang={meaningLang}
             onDone={(r) => finishStage(r, 'final')}
           />
         )}

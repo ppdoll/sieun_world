@@ -137,3 +137,33 @@ test('extractStory: 두 번 다 약하면 weak 로 끝내고, 거절이면 즉�
   assert.equal(r.status, 'refused');
   assert.equal(m.prompts.length, 1);
 });
+
+test('extractWordsFromImage(en): 영영 스키마와 프롬프트로 묻고 풀이를 정리한다', async () => {
+  const seen = [];
+  const callModel = async (req) => {
+    seen.push(req);
+    return reply({
+      words: [
+        { word: 'place', meaning: 'n. A place is a space or area.', example: 'A library is a place.', keys: ['space', 'area'], ko: '장소', chunks: ['place'] },
+      ],
+    });
+  };
+  const r = await extractWordsFromImage({ image: IMG, callModel, lang: 'en' });
+  assert.equal(r.status, 'ok');
+  assert.equal(r.words[0].meaning, 'A place is a space or area.');
+  assert.deepEqual(r.words[0].keys, ['space', 'area']);
+  assert.ok(seen[0].schema.properties.words.items.required.includes('keys'), '영영 스키마로 물어야 한다');
+  assert.match(seen[0].content[1].text, /영영/);
+  assert.match(seen[0].system, /English-English/);
+});
+
+test('extractWordsFromImage: lang 을 안 주면 예전처럼 한글 뜻 스키마로 묻는다', async () => {
+  const seen = [];
+  const callModel = async (req) => {
+    seen.push(req);
+    return reply({ words: [W('creature', '생명체', ['crea', 'ture'])] });
+  };
+  await extractWordsFromImage({ image: IMG, callModel });
+  assert.ok(!seen[0].schema.properties.words.items.required.includes('keys'));
+  assert.doesNotMatch(seen[0].content[1].text, /영영/);
+});

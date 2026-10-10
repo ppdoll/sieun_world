@@ -3,6 +3,7 @@
 // 프롬프트 생성, 응답 해석(잘림·거절·JSON 복구·스키마 검증), 검수용 신뢰도 표시.
 
 import { chunksMatch, extractJson, sanitizeWords } from './wordlab-logic.mjs';
+import { sanitizeDefinitionWords } from './definition-logic.mjs';
 
 /* ── 응답 스키마 (output_config.format 에 그대로 넘긴다) ───────────── */
 
@@ -81,6 +82,35 @@ export const MAX_MNEMONIC_CHARS = 80;
 export const WORDS_SYSTEM =
   'You read photos of Korean-English vocabulary books and return JSON only. No prose, no markdown fences.';
 
+/** 영어 풀이 단어장(영영). 풀이·예문·핵심 낱말을 함께 받는다 */
+export const WORDS_EN_SCHEMA = {
+  type: 'object',
+  properties: {
+    words: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          word: { type: 'string' },
+          meaning: { type: 'string' },
+          example: { type: 'string' },
+          keys: { type: 'array', items: { type: 'string' } },
+          ko: { type: 'string' },
+          chunks: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['word', 'meaning', 'example', 'keys', 'ko', 'chunks'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['words'],
+  additionalProperties: false,
+};
+
+export const WORDS_EN_SYSTEM =
+  'You read photos of English-English vocabulary books (English headwords defined in English) and return JSON only. ' +
+  'Read only the printed text. Ignore handwriting, pen marks, highlighter, underlines, circles, arrows, and Korean notes.';
+
 export const PHONICS_SYSTEM =
   'You are a phonics teacher for Korean elementary students. Return JSON only.';
 
@@ -94,8 +124,26 @@ const REGION_LINE = {
  * 단어 추출 프롬프트. region 은 응답이 잘렸을 때 상/하반부로 나눠 다시 물을 때 쓴다.
  * @param {'all'|'top'|'bottom'} region
  */
-export function wordsPrompt(region = 'all') {
+export function wordsPrompt(region = 'all', lang = 'ko') {
   const lead = REGION_LINE[region] ?? REGION_LINE.all;
+  if (lang === 'en') {
+    return (
+      lead +
+      '\n' +
+      '이 책은 영어 단어를 영어로 풀이한다 (영영 단어장).\n' +
+      '연필·볼펜 글씨, 밑줄, 형광펜, 동그라미, 화살표, 한글 메모는 무시하고 인쇄된 글자만 읽어.\n' +
+      'word: 영어 표제어\n' +
+      'meaning: 표제어 바로 아래 인쇄된 영어 풀이 문장을 글자 그대로. 앞의 품사 표시(n. adj. conj.)는 빼고\n' +
+      'example: 그 아래 인쇄된 예문 한 문장을 글자 그대로. 없으면 빈 문자열\n' +
+      'keys: meaning 에서 빠지면 뜻이 통하지 않는 핵심 낱말 2~4개. meaning 에 실제로 쓰인 낱말만, 표제어는 빼고\n' +
+      'ko: 초등 4학년이 이해할 짧은 한국어 뜻 (도움용)\n' +
+      'chunks: 표제어를 발음 덩어리로 나눈 배열. 이어붙이면 word와 글자가 정확히 같아야 함.\n' +
+      '형식: {"words":[{"word":"because","meaning":"Because introduces a reason for something.",' +
+      '"example":"We need to study because we have a test tomorrow.","keys":["introduces","reason"],' +
+      '"ko":"~ 때문에","chunks":["be","cause"]}]}\n' +
+      'JSON만 출력.'
+    );
+  }
   return (
     lead +
     '\n' +
@@ -135,7 +183,8 @@ export function phonicsPrompt(words) {
  * 아이가 영어 문장을 읽을 수는 없으므로 이야기는 한국어, 단어만 영어다.
  */
 export function storyPrompt(words) {
-  const list = (words ?? []).map((w) => w.word + '(' + w.meaning + ')').join(', ');
+  // 영영 단어장은 뜻이 긴 영어 풀이라, 도움용 한국어 뜻(ko)이 있으면 그것을 쓴다
+  const list = (words ?? []).map((w) => w.word + '(' + (w.ko || w.meaning) + ')').join(', ');
   return (
     '단어: ' + list + '\n\n' +
     '이 단어들 중 5~8개를 넣어 초등 4학년이 읽고 웃을 짧은 이야기를 한국어로 써줘. 3~4문장, 200자 안.\n' +
@@ -164,13 +213,15 @@ export function messageText(message) {
  * - refused: 안전 분류기가 거절. 재시도해도 같으므로 호출 측에서 중단
  * - unparsable: JSON 을 복구하지 못함. 한 번 더 시도할 가치가 있음
  */
-export function parseWordsResponse(message) {
+export function parseWordsResponse(message, lang = 'ko') {
   if (!message || typeof message !== 'object') return { status: 'unparsable', words: [] };
   if (message.stop_reason === 'refusal') return { status: 'refused', words: [] };
 
   const parsed = extractJson(messageText(message));
   // 뜻이 빈 항목은 여기서 버리지 않고 검수 화면에서 표시한다 (단어를 조용히 잃지 않기 위해)
-  const words = sanitizeWords(parsed?.words, { keepEmptyMeaning: true });
+  let words = sanitizeWords(parsed?.words, { keepEmptyMeaning: true });
+  // 영영은 풀이의 품사 표시를 떼고, 핵심 낱말이 풀이에 실제로 있는지 검증한다
+  if (lang === 'en') words = sanitizeDefinitionWords(words);
 
   if (message.stop_reason === 'max_tokens') return { status: 'truncated', words };
   if (!parsed) return { status: 'unparsable', words: [] };

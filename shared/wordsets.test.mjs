@@ -146,3 +146,27 @@ test('combineWordSets: 단어는 중복 없이, 규칙은 pattern 기준으로 �
   assert.equal(c.count, 2);
   assert.deepEqual(combineWordSets(null).words, []);
 });
+
+test('setLang / commonLang: 종류가 같으면 그 종류, 섞이면 mixed, 예전 단어장은 ko', async () => {
+  const { setLang, commonLang } = await import('./wordsets.mjs');
+  const ko = setAt(1000);
+  const en = { ...setAt(2000), meaningLang: 'en' };
+  assert.equal(setLang(ko), 'ko');
+  assert.equal(setLang(en), 'en');
+  assert.equal(commonLang([en, { ...en, id: 'x' }]), 'en');
+  assert.equal(commonLang([ko, en]), 'mixed');
+  assert.equal(commonLang([]), 'ko');
+});
+
+test('combineWordSets: 묶은 단어장의 종류를 함께 알려준다', async () => {
+  const { combineWordSets } = await import('./wordsets.mjs');
+  const en = { ...setAt(1000, [W('east')]), meaningLang: 'en' };
+  assert.equal(combineWordSets([en]).meaningLang, 'en');
+  assert.equal(combineWordSets([en, setAt(2000)]).meaningLang, 'mixed');
+});
+
+test('toRemoteWordSet: 영어 풀이 단어장이면 종류를 함께 올린다', async () => {
+  const { toRemoteWordSet } = await import('./wordsets.mjs');
+  assert.equal(toRemoteWordSet({ ...setAt(1000), meaningLang: 'en' }).meaningLang, 'en');
+  assert.equal(toRemoteWordSet(setAt(1000)).meaningLang, undefined, '한글 뜻은 예전 모양 그대로');
+});

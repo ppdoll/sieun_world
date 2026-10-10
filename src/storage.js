@@ -53,3 +53,18 @@ export function loadPassageSets() {
   const list = readJson(PASSAGE_KEY);
   return Array.isArray(list) ? list : [];
 }
+
+const PICK_LANG_KEY = 'wordlab:lang';
+
+/** 사진 올리기에서 마지막으로 고른 단어장 종류. 'ko' 한글 뜻 | 'en' 영어 풀이 */
+export function loadPickLang() {
+  try {
+    return readJson(PICK_LANG_KEY) === 'en' ? 'en' : 'ko';
+  } catch {
+    return 'ko';
+  }
+}
+
+export function savePickLang(lang) {
+  writeJson(PICK_LANG_KEY, lang === 'en' ? 'en' : 'ko');
+}

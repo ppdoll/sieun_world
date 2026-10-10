@@ -349,3 +349,62 @@ test('parseStoryResponse: 단어가 2개 이상 들어가면 ok, 아니면 weak,
   assert.equal(parseStoryResponse(msg('???'), WORDS).status, 'unparsable');
   assert.equal(parseStoryResponse({ content: [], stop_reason: 'refusal' }, WORDS).status, 'refused');
 });
+
+/* ── 영어 풀이 단어장(영영) ───────────────────────────────────── */
+
+test('wordsPrompt(en): 풀이·예문·핵심 낱말을 요구하고 손글씨를 무시하라고 한다', () => {
+  const p = wordsPrompt('all', 'en');
+  assert.match(p, /영영 단어장/);
+  assert.match(p, /형광펜/);
+  assert.match(p, /keys/);
+  assert.match(p, /example/);
+  assert.doesNotMatch(wordsPrompt('all'), /영영/, '한글 뜻 단어장 프롬프트는 그대로');
+});
+
+test('wordsPrompt(en, top): 상반부 요청도 영영 지시를 유지한다', () => {
+  const p = wordsPrompt('top', 'en');
+  assert.match(p, /위쪽 절반/);
+  assert.match(p, /영영/);
+});
+
+test('parseWordsResponse(en): 품사 표시를 떼고 핵심 낱말을 풀이와 대조한다', async () => {
+  const r = parseWordsResponse(
+    msg(
+      JSON.stringify({
+        words: [
+          {
+            word: 'because',
+            meaning: 'conj. Because introduces a reason for something.',
+            example: 'We need to study because we have a test tomorrow.',
+            keys: ['reason', 'cause'],
+            ko: '~ 때문에',
+            chunks: ['be', 'cause'],
+          },
+        ],
+      })
+    ),
+    'en'
+  );
+  assert.equal(r.status, 'ok');
+  const [w] = r.words;
+  assert.equal(w.meaning, 'Because introduces a reason for something.');
+  assert.deepEqual(w.keys, ['reason'], '풀이에 없는 cause 는 버린다');
+  assert.equal(w.example, 'We need to study because we have a test tomorrow.');
+  assert.equal(w.ko, '~ 때문에');
+});
+
+test('parseWordsResponse(ko): 한글 뜻 단어장은 핵심 낱말을 만들지 않는다', () => {
+  const r = parseWordsResponse(msg(JSON.stringify({ words: [{ word: 'creature', meaning: '생명체', chunks: ['crea', 'ture'] }] })));
+  assert.equal(r.words[0].keys, undefined);
+});
+
+test('WORDS_EN_SCHEMA: 영영 칸이 모두 필수다', async () => {
+  const { WORDS_EN_SCHEMA } = await import('./extract-logic.mjs');
+  assert.deepEqual(WORDS_EN_SCHEMA.properties.words.items.required, ['word', 'meaning', 'example', 'keys', 'ko', 'chunks']);
+});
+
+test('storyPrompt: 영영 단어장은 도움용 한국어 뜻을 쓴다', async () => {
+  const { storyPrompt } = await import('./extract-logic.mjs');
+  const p = storyPrompt([{ word: 'east', meaning: 'East is the direction the sun rises from.', ko: '동쪽' }]);
+  assert.match(p, /east\(동쪽\)/);
+});

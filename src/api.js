@@ -103,9 +103,12 @@ function loadImage(src) {
   });
 }
 
-/** 사진 한 장 → { words, status, split } */
-export function extractFromImage(image) {
-  return post('/api/extract', { image });
+/**
+ * 사진 한 장 → { words, status, split }
+ * lang 'en' 이면 영어 풀이 단어장(영영)으로 읽어 풀이·예문·핵심 낱말을 함께 받는다
+ */
+export function extractFromImage(image, lang = 'ko') {
+  return post('/api/extract', { image, lang });
 }
 
 /** 단어 목록 → { phonics, status } */

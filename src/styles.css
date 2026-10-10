@@ -257,3 +257,44 @@ body{background:#EDF3F8}
 .wl-qko{width:100%;background:#FFF7D6;border-radius:10px;padding:10px 12px;font-size:14.5px;line-height:1.7;
   color:#6B5300;text-align:left;word-break:keep-all}
 .wl-qko-l{display:block;font-size:11.5px;font-weight:800;opacity:.75;margin-bottom:2px}
+
+/* ── 단어장 종류 고르기 ── */
+.wl-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.wl-seg-b{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;background:var(--card);
+  border:2px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.wl-seg-b.on{border-color:var(--acc);background:#F3F8FC}
+.wl-seg-b:disabled{cursor:default}
+.wl-seg-t{font-size:15px;font-weight:800}
+.wl-seg-b.on .wl-seg-t{color:var(--acc)}
+.wl-seg-s{font-size:12px;color:var(--ink2)}
+.wl-tag{display:inline-block;background:#E3EDF6;color:#1C5A8F;font-size:11px;font-weight:800;border-radius:6px;
+  padding:1px 6px;margin-right:6px;vertical-align:1px}
+
+/* ── 영어 풀이 검수 카드 ── */
+.wl-dcards{display:flex;flex-direction:column;gap:8px}
+.wl-dcard{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:10px;display:flex;
+  flex-direction:column;gap:4px}
+.wl-dcard.flagged{background:#FFFBE6;border-color:#F0DFA0}
+.wl-dcard-top{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center}
+.wl-dcard-word{font-weight:800}
+.wl-dcard-def{resize:vertical;line-height:1.5;font-size:15px}
+.wl-dcard .wl-cell{border-color:var(--line);background:#FBFDFF}
+.wl-dlabel{font-size:11.5px;font-weight:700;color:var(--ink2);padding:4px 2px 0}
+.wl-dkeys{font-size:12px;color:#1F7A50;font-weight:700;padding:0 2px}
+.wl-dcard-mini .wl-cell{font-size:13px;padding:6px 8px}
+.wl-dcard-mini{display:flex;flex-direction:column;gap:2px}
+
+/* ── 영어 풀이 보여주기 ── */
+.wl-defbox{width:100%;background:#F7FBFE;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;
+  gap:8px;text-align:left}
+.wl-def{font-size:17px;line-height:1.65;font-weight:700;color:var(--ink);word-break:keep-all;text-align:left;width:100%}
+.wl-def-ko{font-size:14px;color:var(--ink2);font-weight:700;text-align:left;width:100%}
+.wl-def-ex{font-size:14.5px;line-height:1.6;color:var(--ink2);font-style:italic}
+.wl-prompt-def{font-size:20px;line-height:1.55;text-align:left;word-break:keep-all}
+.wl-input-def{font-size:17px;text-align:left;line-height:1.5;resize:none;font-weight:600}
+.wl-hint-def{font-size:16px;font-weight:700;line-height:1.7;background:#FFF7D6;border-radius:8px;padding:8px 12px;
+  text-align:left;letter-spacing:.02em}
+.wl-hint-ex{font-size:14px;color:var(--ink2);font-style:italic;text-align:center;line-height:1.6}
+.wl-key{border-radius:5px;padding:0 3px;font-weight:800}
+.wl-key-found{background:#E4F5EC;color:#1F7A50}
+.wl-key-missing{background:var(--hl);color:var(--ink)}

@@ -61,7 +61,22 @@ export function combineWordSets(sets) {
       for (const [w, tip] of Object.entries(s.mnemonics)) if (tip && !mnemonics[w]) mnemonics[w] = tip;
     }
   }
-  return { words, phonics, mnemonics, count: list.length };
+  return { words, phonics, mnemonics, count: list.length, meaningLang: commonLang(list) };
+}
+
+/** 단어장 종류: 'ko' 한글 뜻 | 'en' 영어 풀이. 예전 단어장에는 없으니 'ko' 로 본다 */
+export function setLang(set) {
+  return set?.meaningLang === 'en' ? 'en' : 'ko';
+}
+
+/**
+ * 여러 단어장의 종류. 다 같으면 그 종류, 섞여 있으면 'mixed'.
+ * 한글 뜻과 영어 풀이는 시험 유형이 달라 한 문제지로 묶을 수 없다.
+ */
+export function commonLang(sets) {
+  const langs = new Set((Array.isArray(sets) ? sets : []).filter(Boolean).map(setLang));
+  if (langs.size === 0) return 'ko';
+  return langs.size === 1 ? [...langs][0] : 'mixed';
 }
 
 /** id 로 하나 지운다 */
@@ -118,7 +133,7 @@ export function toRemoteWordSet(set) {
     set.mnemonics && typeof set.mnemonics === 'object' && !Array.isArray(set.mnemonics)
       ? Object.fromEntries(Object.entries(set.mnemonics).slice(0, 100))
       : {};
-  return {
+  const out = {
     id: set.id,
     at: Number(set.at) || Date.now(),
     words: set.words.slice(0, 100),
@@ -126,6 +141,9 @@ export function toRemoteWordSet(set) {
     mnemonics,
     story: typeof set.story === 'string' ? set.story.slice(0, 600) : '',
   };
+  // 영어 풀이 단어장일 때만 붙인다. 없으면 받는 쪽이 한글 뜻으로 본다
+  if (setLang(set) === 'en') out.meaningLang = 'en';
+  return out;
 }
 
 /**

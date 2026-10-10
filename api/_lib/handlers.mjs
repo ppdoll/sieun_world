@@ -70,9 +70,11 @@ export function makeExtractHandler({ callModel, passcode, Anthropic } = {}) {
     if (!body) return;
     const image = imageFromBody(body, res);
     if (!image) return;
+    // 'en' 이면 영어 풀이 단어장(영영). 모르는 값은 예전처럼 한글 뜻 단어장
+    const lang = body.lang === 'en' ? 'en' : 'ko';
 
     try {
-      const result = await extractWordsFromImage({ image, callModel });
+      const result = await extractWordsFromImage({ image, callModel, lang });
       if (result.status === 'refused') {
         return send(res, 422, { error: '이 사진은 읽을 수 없었어요. 단어장 페이지만 나오게 다시 찍어주세요.' });
       }
