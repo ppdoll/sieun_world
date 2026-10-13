@@ -68,3 +68,45 @@ test('detectMeaningLang: 뜻의 절반 넘게 한글이면 ko, 아니면 en', ()
   assert.equal(detectMeaningLang([{ meaning: BECAUSE }, { meaning: MILLION }, { meaning: '산호초' }]), 'en');
   assert.equal(detectMeaningLang([]), 'ko');
 });
+
+/* ── 핵심 낱말 보기 ───────────────────────────────────────────── */
+
+// 실제 교재 WORD LIST 페이지
+const PAGE = [
+  { word: 'because', meaning: 'Because introduces a reason for something.', keys: ['introduces', 'reason'] },
+  { word: 'flower', meaning: 'A flower is the colored part of a plant.', keys: ['colored', 'part', 'plant'] },
+  { word: 'garden', meaning: 'A garden is an area where people grow plants.', keys: ['area', 'grow', 'plants'] },
+  { word: 'place', meaning: 'A place is a space or area.', keys: ['space', 'area'] },
+  { word: 'mountain', meaning: 'A mountain is a very high hill.', keys: ['high', 'hill'] },
+];
+
+test('keysOf: 단어장의 핵심 낱말을 쓰고, 없으면 풀이에서 고른다', async () => {
+  const { keysOf } = await import('./definition-logic.mjs');
+  assert.deepEqual(keysOf(PAGE[0]), ['introduces', 'reason']);
+  assert.deepEqual(keysOf({ word: 'place', meaning: 'A place is a space or area.' }), ['space', 'area']);
+  assert.deepEqual(keysOf(null), []);
+});
+
+test('keyGroups: 여러 풀이에 함께 나오는 낱말을 많이 나온 순으로 모은다', async () => {
+  const { keyGroups } = await import('./definition-logic.mjs');
+  const groups = keyGroups(PAGE);
+  const area = groups.find((g) => g.key === 'area');
+  assert.deepEqual(area.words, ['garden', 'place']);
+  const plant = groups.find((g) => /plant/.test(g.key));
+  assert.deepEqual(plant.words, ['flower', 'garden'], '변화형(plant/plants)도 한 묶음');
+  assert.ok(groups.every((g) => g.words.length >= 2), '한 번만 나온 낱말은 묶지 않는다');
+  assert.ok(!groups.some((g) => g.key === 'reason'));
+});
+
+test('keyGroups: 한 단어 안에서 같은 낱말이 두 번 나와도 한 번만 센다', async () => {
+  const { keyGroups } = await import('./definition-logic.mjs');
+  const dup = [{ word: 'x', meaning: 'A plant grows plants.', keys: ['plant', 'plants', 'grows'] }];
+  assert.deepEqual(keyGroups(dup), []);
+});
+
+test('keyGroups: 최대 개수까지만, 빈 입력은 빈 배열', async () => {
+  const { keyGroups } = await import('./definition-logic.mjs');
+  assert.ok(keyGroups(PAGE, { min: 1, max: 3 }).length <= 3);
+  assert.deepEqual(keyGroups(null), []);
+  assert.deepEqual(keyGroups([{ word: 'a' }]), []);
+});

@@ -298,3 +298,15 @@ body{background:#EDF3F8}
 .wl-key{border-radius:5px;padding:0 3px;font-weight:800}
 .wl-key-found{background:#E4F5EC;color:#1F7A50}
 .wl-key-missing{background:var(--hl);color:var(--ink)}
+
+/* ── 영영: 핵심 낱말 보기 ── */
+.wl-key-focus{background:var(--hl);color:var(--ink)}
+.wl-groups{display:flex;flex-direction:column;gap:8px}
+.wl-group{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.wl-group-words{display:flex;gap:4px;flex-wrap:wrap}
+.wl-group .wl-wordpill{font-size:14px;font-weight:700;padding:5px 9px}
+.wl-kcard{background:var(--card);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.wl-kcard-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wl-kcard-word{background:none;border:none;padding:0;cursor:pointer;font-family:inherit}
+.wl-kcard-ko{font-size:13px;color:var(--ink2);font-weight:700}
+.wl-kcard .wl-ghost{align-self:flex-start}

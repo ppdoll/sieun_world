@@ -67,3 +67,38 @@ export function detectMeaningLang(words) {
   const ko = list.filter((w) => /[가-힣]/.test(w.meaning)).length;
   return ko * 2 > list.length ? 'ko' : 'en';
 }
+
+/* ── 풀이의 핵심 낱말 보기 (영영 단어장의 2단계) ─────────────────── */
+
+/** 단어 하나가 실제로 채점에 쓰는 핵심 낱말. 비어 있으면 풀이에서 고른다 */
+export function keysOf(word) {
+  return sanitizeKeys(word?.keys, word?.meaning, word?.word);
+}
+
+/**
+ * 여러 풀이에 함께 나오는 낱말을 모은다. 파닉스가 규칙으로 단어를 묶던 자리를 대신한다.
+ * garden 과 place 의 풀이에 둘 다 area 가 나오는 식이라, 풀이끼리 이어 보면 외우기 쉽다.
+ *
+ * @returns {{key: string, words: string[]}[]} 많이 나온 순, 같으면 먼저 나온 순
+ */
+export function keyGroups(words, { min = 2, max = 6 } = {}) {
+  const list = (Array.isArray(words) ? words : []).filter((w) => w?.word && w?.meaning);
+  const byStem = new Map(); // 어간 → { label, words[], order }
+  list.forEach((w, order) => {
+    for (const key of keysOf(w)) {
+      const stem = tokenizeText(key).map(stemWord).join(' ');
+      if (!stem) continue;
+      const hit = byStem.get(stem);
+      if (hit) {
+        if (!hit.words.includes(w.word)) hit.words.push(w.word);
+      } else {
+        byStem.set(stem, { key, words: [w.word], order });
+      }
+    }
+  });
+  return [...byStem.values()]
+    .filter((g) => g.words.length >= min)
+    .sort((a, b) => b.words.length - a.words.length || a.order - b.order)
+    .slice(0, max)
+    .map(({ key, words: ws }) => ({ key, words: ws }));
+}

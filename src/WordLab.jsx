@@ -8,7 +8,14 @@ import {
   blankWord,
   markKeys,
 } from '../shared/wordlab-logic.mjs';
-import { sanitizeDefinitionWords, sanitizeKeys, detectMeaningLang, normLang } from '../shared/definition-logic.mjs';
+import {
+  sanitizeDefinitionWords,
+  sanitizeKeys,
+  detectMeaningLang,
+  normLang,
+  keysOf,
+  keyGroups,
+} from '../shared/definition-logic.mjs';
 import { flagWords, normalizeLetters, highlightChunks, sanitizePhonics, splitStory } from '../shared/extract-logic.mjs';
 import { buildAssembly, gradeAssembly } from '../shared/assembly.mjs';
 import { parseWordLines } from '../shared/manual-entry.mjs';
@@ -619,6 +626,101 @@ function Phonics({ phonics: rawPhonics, loading, error, words, onNext, onRefresh
 }
 
 /* ────────────────────────────────────────────────────────────
+   2-en. 핵심 낱말 보기 — 영영 단어장은 파닉스 대신 이 화면
+   ──────────────────────────────────────────────────────────── */
+
+/** 풀이를 보여주되 핵심 낱말에 표시를 단다 */
+function KeyedDefinition({ text, keys, className = 'wl-def' }) {
+  return (
+    <div className={className}>
+      {markKeys(text, keys, []).map((p, k) =>
+        p.mark ? (
+          <span key={k} className="wl-key wl-key-focus">
+            {p.text}
+          </span>
+        ) : (
+          <span key={k}>{p.text}</span>
+        )
+      )}
+    </div>
+  );
+}
+
+function KeyWords({ words, onNext }) {
+  const [open, setOpen] = useState(null); // 풀이를 가려 둔 채 확인하는 카드
+  const groups = keyGroups(words);
+  const byWord = Object.fromEntries(words.map((w) => [w.word, w]));
+
+  return (
+    <div className="wl-pane">
+      <h2 className="wl-h2">풀이에서 꼭 볼 곳</h2>
+      <p className="wl-sub">
+        시험에서 풀이를 쓸 때 <b>노란 낱말</b>이 들어가야 맞아요. 단어를 눌러 소리를 들어보세요.
+      </p>
+
+      {groups.length > 0 && (
+        <div className="wl-rule">
+          <div className="wl-rule-head">
+            <span className="wl-pattern">여러 풀이에 나오는 낱말</span>
+          </div>
+          <p className="wl-tip">이 낱말을 알면 풀이 여러 개가 한꺼번에 풀려요.</p>
+          <div className="wl-groups">
+            {groups.map((g) => (
+              <div className="wl-group" key={g.key}>
+                <span className="wl-key wl-key-focus">{g.key}</span>
+                <span className="wl-group-words">
+                  {g.words.map((w) => (
+                    <button key={w} className="wl-wordpill" onClick={() => speak(w)}>
+                      {w}
+                    </button>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {words.map((w) => {
+        const keys = keysOf(w);
+        const hidden = open !== w.word;
+        return (
+          <div className="wl-kcard" key={w.word}>
+            <div className="wl-kcard-top">
+              <button className="wl-kcard-word" onClick={() => speak(w.word)}>
+                <ChunkWord chunks={w.chunks} size="sm" />
+              </button>
+              {w.ko && <span className="wl-kcard-ko">{w.ko}</span>}
+            </div>
+            {hidden ? (
+              <button className="wl-ghost wl-sm" onClick={() => setOpen(w.word)}>
+                풀이 보기 · 핵심 낱말 {keys.length}개
+              </button>
+            ) : (
+              <>
+                <KeyedDefinition text={w.meaning} keys={keys} />
+                {w.example && <div className="wl-def-ex">{w.example}</div>}
+                <div className="wl-row wl-center">
+                  <SpeakBtn text={w.meaning} label="풀이 듣기" rate={0.85} />
+                  <button className="wl-ghost wl-sm" onClick={() => setOpen(null)}>
+                    가리기
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })}
+
+      <button className="wl-cta" onClick={onNext}>
+        덩어리로 읽어보기
+      </button>
+      <p className="wl-note">풀이를 가려 두고 떠올려 본 뒤 열어서 맞춰 보면 더 잘 외워져요.</p>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
    3. 덩어리 읽기
    ──────────────────────────────────────────────────────────── */
 
@@ -1149,9 +1251,10 @@ function Result({ summary, words, mode, onNext, onRetry }) {
    ──────────────────────────────────────────────────────────── */
 
 /** 상단 단계. 조립·이야기는 "덩어리" 안의 연습이라 같은 칸에 둔다 (칸을 늘리면 폰에서 글자가 깨진다) */
-const WORD_STEPS = [
+const wordSteps = (lang) => [
   { key: 'upload', label: '사진' },
-  { key: 'phonics', label: '파닉스' },
+  // 영영 단어장은 파닉스 자리에 풀이의 핵심 낱말을 본다
+  { key: 'phonics', label: lang === 'en' ? '핵심' : '파닉스' },
   { key: 'chunks', label: '덩어리' },
   { key: 'quiz', label: '시험' },
   { key: 'review', label: '오답' },
@@ -1254,8 +1357,12 @@ export default function WordLab({ onHome }) {
     setStep(key);
   }
 
-  /** 단어 목록만 보내 규칙을 (다시) 만든다. 사진은 다시 읽지 않는다 */
-  async function loadPhonics(w, id) {
+  /**
+   * 단어 목록만 보내 규칙을 (다시) 만든다. 사진은 다시 읽지 않는다.
+   * 영영 단어장은 파닉스 대신 풀이의 핵심 낱말을 보여주므로 부르지 않는다 (이미 뽑아 둔 값이라 공짜).
+   */
+  async function loadPhonics(w, id, lang = meaningLang) {
+    if (lang === 'en') return;
     setPhonicsLoading(true);
     setPhonicsError('');
     try {
@@ -1316,7 +1423,7 @@ export default function WordLab({ onHome }) {
     setStoryError('');
     setWrongWords([]);
     setStep('phonics');
-    loadPhonics(w, set.id);
+    loadPhonics(w, set.id, l);
   }
 
   /** 저장된 단어장 이어서 하기. 이 기기에서 공부한 기록을 남긴다 (공유에서 받은 것도 이 기기 것이 된다) */
@@ -1424,7 +1531,7 @@ export default function WordLab({ onHome }) {
           )}
         </header>
 
-        {showSteps && <Steps items={WORD_STEPS} idx={stepIndex(shellStep)} onJump={jump} canJump={canJump} />}
+        {showSteps && <Steps items={wordSteps(meaningLang)} idx={stepIndex(shellStep)} onJump={jump} canJump={canJump} />}
 
         {step === 'upload' && (
           <Upload
@@ -1452,16 +1559,19 @@ export default function WordLab({ onHome }) {
           />
         )}
 
-        {step === 'phonics' && (
-          <Phonics
-            phonics={phonics}
-            loading={phonicsLoading}
-            error={phonicsError}
-            words={words}
-            onNext={() => setStep('chunks')}
-            onRefresh={() => loadPhonics(words, currentId)}
-          />
-        )}
+        {step === 'phonics' &&
+          (meaningLang === 'en' ? (
+            <KeyWords words={words} onNext={() => setStep('chunks')} />
+          ) : (
+            <Phonics
+              phonics={phonics}
+              loading={phonicsLoading}
+              error={phonicsError}
+              words={words}
+              onNext={() => setStep('chunks')}
+              onRefresh={() => loadPhonics(words, currentId)}
+            />
+          ))}
 
         {step === 'chunks' && <Chunks words={words} mnemonics={mnemonics} lang={meaningLang} onNext={afterChunks} />}
 
